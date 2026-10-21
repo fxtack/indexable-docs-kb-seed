@@ -1,0 +1,107 @@
+# {{PROJECT_NAME}} 知识库
+
+<!--
+本文档是 KB 使用入口。Goal 3 Stage 6 由 sub-agent 基于本模板 + index.yaml + .meta-knowledge-base-guide.md + CLAUDE.md 生成实际内容。
+生成时请填充所有 {{占位符}}，删除本注释块，删除本模板中所有 {ADAPT:...} 提示，控制在 100 行以内。
+-->
+
+> {{ONE_LINE_KB_POSITIONING: 一句话说明本 KB 的定位和使用场景}}
+
+本知识库覆盖 {{PROJECT_NAME}} 的架构、模块、流程、排障四个维度，服务于 AI Agent 的快速检索和人类开发者的深入理解。
+
+---
+
+## 快速开始
+
+**AI Agent**：
+- 遇到任何涉及模块职责、跨模块流程、设计决策或异常排查的任务时，先读取 `index.yaml`
+- 通过 `keywords` / `covers_code` / `covers_commands` 匹配相关文档
+- 深度操作时调用 `/explore-kb` skill；一致性维护调用 `/maintain-kb` skill
+
+**人类开发者**：
+- 了解全局：从 `architecture/` 入门
+- 深入模块：读 `modules/<module-id>.md`
+- 排查故障：从 `troubleshooting/symptom-index.yaml` 开始（症状 → Runbook 四级检索链）
+- 研发任务：按 `works/.meta-work-guide.md` 创建 Work 文档
+
+---
+
+## 目录结构
+
+| 目录 | 内容 | 面向 |
+|------|------|------|
+| `architecture/` | 系统全景、技术栈、领域模型 | 全局认知 |
+| `modules/` | 模块权威知识源（数据模型/API/流程/陷阱/影响范围） | 深度理解 |
+| `flows/` | 跨模块端到端流程串联 | 数据流理解 |
+| `troubleshooting/` | 症状路由 + Runbook + FAQ + 已知 Bug + Incident | 故障排查 |
+| `develop/` | 研发行为规范、编码约定、操作指南 | 实施阶段 |
+| `works/` | 研发任务中枢（需求 → 决策 → 实施 → 归档） | 任务全流程 |
+| `pass/` | 外部输入只读中转（不入索引） | 只读参考 |
+
+---
+
+## 文档类型
+
+| 类型 | 特点 | 权威性 |
+|------|------|--------|
+| Module 文档 | 详尽结构化，每模块一份 | 权威源（唯一） |
+| Flow 文档 | 轻量导航，链接串联 modules | 引用型 |
+| Architecture 文档 | 全景视图 | 稳定，少变更 |
+| Runbook | 结构化决策树，可机械执行 | 排障权威 |
+| Incident Record | 轻量事件记录（YAML） | 排障原始语料 |
+| Work 文档 | 研发任务全过程 | 决策历史归档 |
+
+---
+
+## 检索指南
+
+**通过 index.yaml**：
+- `keywords` 关键词模糊匹配
+- `covers_code` 精确到源文件路径
+- `covers_commands` 精确到 CLI 命令
+- `depends_on` / `involves_modules` 追踪关联文档
+
+**通过 skill**：
+- `/explore-kb <question>` — 三级降级检索，综合回答
+- `/maintain-kb` — 一致性检查与修复
+
+**故障排查专用检索链**（四级从快到慢）：
+1. `troubleshooting/symptom-index.yaml`（症状路由）
+2. `troubleshooting/faq.md`（高频问题）
+3. `troubleshooting/known-bugs.md`（已知代码缺陷）
+4. 兜底逆向追踪（从产品全局视角）
+
+---
+
+## 维护方式
+
+**代码变更后同步 KB**：调用 `/maintain-kb`（默认增量模式，基于 git diff 定位受影响文档）
+
+**新增知识**：
+- 新增模块 → 在 `modules/` 创建文档 + 更新 `index.yaml`
+- 新增跨模块流程 → 在 `flows/` 创建文档 + 更新 `index.yaml`
+- 排障新知识 → 在 `troubleshooting/incidents/` 记录 Incident Record，积累后转 Runbook
+
+**新增隐性知识**（代码里读不到的，如测试策略、性能基准、事故经验）：
+- 参考 `knowledge-extract-qa-guide.md` 定义的 QA 提取工作流
+
+---
+
+## 贡献指南
+
+- 所有代码位置引用使用**符号名锚定**，禁止行号引用
+- 模块文档是唯一权威源，flows / troubleshooting 通过链接引用不重复内容
+- 图表优先使用 Mermaid，ASCII art 仅在 Mermaid 表达不足时使用
+- 提交前用 `/maintain-kb` 校验一致性
+
+---
+
+## 关键元文档
+
+- [知识库构建规范](.meta-knowledge-base-guide.md)
+- [Work 文档规范](works/.meta-work-guide.md)
+- [Runbook 编写规范](troubleshooting/runbooks/.meta-runbook-guide.md)
+- [Incident Record 规范](troubleshooting/incidents/.meta-incident-guide.md)
+- [隐性知识提取 QA 工作流](knowledge-extract-qa-guide.md)
+
+**版本**：由 AFMT-KB-SEED 种子包 v{{SEED_PACK_VERSION}} 于 {{BUILT_AT}} 构建。版本契约详见 `index.yaml.meta`。

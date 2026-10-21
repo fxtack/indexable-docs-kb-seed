@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "urn:afmt-kb-seed:schema:qa-jsonl-entry",
+  "title": "AFMT-KB-SEED QA JSONL Entry",
+  "description": "本文件规范 .think-tank/knowledge-base/pass/{doc_id}.qa.jsonl 中每一行的格式。Stage 3 生成时写入 round=0；Stage 4 每轮 Review 追加对应 round。**文件路径硬性约束（v2.0.1）**：QA jsonl 文件必须写入 .think-tank/knowledge-base/pass/ 目录下，路径必须以 .think-tank/knowledge-base/pass/ 开头，不允许 pass/{doc_id}.qa.jsonl（相对路径）或 .think-tank/knowledge-base/architecture/pass/... 等散落位置。",
+  "type": "object",
+  "required": ["round", "doc_id", "location", "severity", "type", "question", "status"],
+  "properties": {
+    "round": {
+      "oneOf": [
+        { "type": "integer", "minimum": 0 },
+        { "type": "string", "enum": ["post-build"] }
+      ],
+      "description": "0 = Stage 3 文档生成时发现；1+ = Stage 4 Review 轮次；\"post-build\" = 人类回答后追加的 resolved 条目"
+    },
+    "doc_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+    },
+    "entry_id": {
+      "type": "string",
+      "description": "可选。若提供则可被后续条目通过 resolves 引用；否则用 {doc_id}#{round}#{index} 自动生成"
+    },
+    "location": {
+      "type": "string",
+      "description": "文档内的章节位置，如 \"§3 关键 API\" 或 \"frontmatter\""
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["critical", "medium", "minor"],
+      "description": "严格按 prompts/stage-4-subagent.md 中的锚定示例判定。就高不就低。"
+    },
+    "type": {
+      "type": "string",
+      "description": "问题类型，建议值（非枚举，可扩展）：signature-mismatch / data-flow-error / design-rationale-unclear / prerequisite-missing / description-outdated / section-missing / terminology-inconsistent / cross-reference-missing / typo / formatting",
+      "examples": [
+        "signature-mismatch",
+        "data-flow-error",
+        "design-rationale-unclear",
+        "prerequisite-missing",
+        "description-outdated"
+      ]
+    },
+    "question": {
+      "type": "string",
+      "minLength": 5,
+      "description": "问题的完整描述。对代码歧义要具体到符号名。"
+    },
+    "code_reference": {
+      "type": "string",
+      "description": "关联的代码位置，用符号名锚定（如 \"<File>.<ext>: <FunctionOrClassName>\"）。**禁止行号**。"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["open", "resolved", "resolved_in_this_round", "abandoned"],
+      "description": "open=待人类回答；resolved=已解决（可能在同一轮修复，或后续轮次由 resolves 关联解决）；resolved_in_this_round=Review sub-agent 发现即修复；abandoned=达到 Review 上限仍未解决且被人类决策放弃"
+    },
+    "action_taken": {
+      "type": "string",
+      "description": "若已修复，简述修复动作"
+    },
+    "resolves": {
+      "type": "string",
+      "description": "若本条目解决了之前的某条目，写入其 entry_id"
+    },
+    "human_answer": {
+      "type": "string",
+      "description": "post-build 人类回答后追加"
+    }
+  }
+}

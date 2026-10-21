@@ -1,0 +1,200 @@
+# AFMT-KB-SEED Goal 2 Task Document Schema
+# 描述 Goal 1 Stage C 填充 AFMT-KB-SEED-bake.md.template 时的参数结构。
+# 主 Agent 在填充模板前，应先构造符合此 schema 的参数对象。
+
+$schema: "http://json-schema.org/draft-07/schema#"
+title: "AFMT-KB-SEED Goal 2 Task Document Parameters"
+type: object
+required:
+  - seed_pack_version
+  - project_name
+  - project_scale
+  - architecture_docs
+  - module_docs
+  - flow_docs
+  - stage3_batches
+  - batch_concurrency
+  - review_docs
+  - review_max_rounds
+  - convergence_criteria
+  - max_turns
+
+properties:
+  # ─── project ─────────────────────────────────────────
+  seed_pack_version:
+    type: string
+    pattern: "^\\d+\\.\\d+\\.\\d+$"
+    description: "从 .think-tank/afmt-kb-seed/VERSION 读取"
+
+  project_name:
+    type: string
+    minLength: 1
+
+  project_scale:
+    type: string
+    enum: [small, medium, large]
+    description: "Stage A.2 判定结果（取 A1/A2/A3 的最大值）"
+
+  scale_reason:
+    type: string
+    description: "规模判定依据的一句话总结（写入模板 SCALE_REASON 占位符）"
+
+  # ─── excluded_paths（v1.1.2 新增） ────────────────────
+  excluded_paths:
+    type: array
+    description: "Stage A1 识别、经人类 review 后确认的排除路径清单（第三方源码 / 生成产物 / submodule）。Stage 3 / Stage 4 / Goal 3 Stage 8 必须尊重此清单"
+    items:
+      type: object
+      required: [path, reason, certainty]
+      properties:
+        path:
+          type: string
+          description: "相对于工程根目录，末尾带 / 表示目录，不带表示文件模式（如 vendor/, ext/, generated/, *.pb.go）"
+        reason:
+          type: string
+          description: "为什么排除，越具体越好"
+        certainty:
+          type: string
+          enum: [high, medium, low]
+        needs_human_review:
+          type: boolean
+          default: false
+          description: "certainty == low 时通常为 true。人类 review 确认后应改为 false"
+
+  # ─── document lists ──────────────────────────────────
+  architecture_docs:
+    type: array
+    items:
+      type: object
+      required: [id, path, covers_code]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        path: { type: string }
+        covers_code:
+          type: array
+          items: { type: string }
+        depends_on:
+          type: array
+          items: { type: string }
+          default: []
+
+  module_docs:
+    type: array
+    items:
+      type: object
+      required: [id, path, covers_code, depends_on]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        path: { type: string }
+        covers_code:
+          type: array
+          items: { type: string }
+        depends_on:
+          type: array
+          items: { type: string }
+
+  flow_docs:
+    type: array
+    items:
+      type: object
+      required: [id, path, covers_code, involves_modules]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        path: { type: string }
+        covers_code:
+          type: array
+          items: { type: string }
+        involves_modules:
+          type: array
+          items: { type: string }
+          minItems: 1
+
+  # ─── stage 3 batching ────────────────────────────────
+  stage3_batches:
+    type: array
+    description: "拓扑排序后的批次划分。每个 batch 内的 docs 之间无依赖或依赖已在前批完成。"
+    items:
+      type: object
+      required: [batch, docs]
+      properties:
+        batch:
+          type: integer
+          minimum: 1
+        docs:
+          type: array
+          items: { type: string }
+          description: "本批的 doc_id 列表"
+        rationale:
+          type: string
+          description: "批次划分依据（如 \"batch 1 无依赖\" / \"batch 2 依赖 batch 1 的 X, Y\"）"
+
+  batch_concurrency:
+    type: integer
+    description: "每批最多并发 sub-agent 数。small: 无限制（用 999 表示）/ medium: 8 / large: 6"
+    enum: [999, 8, 6]
+
+  cycle_broken:
+    type: array
+    description: "Stage C 处理依赖环时的决策记录（若存在环）"
+    items:
+      type: object
+      required: [cycle, resolution]
+      properties:
+        cycle:
+          type: array
+          items: { type: string }
+        resolution:
+          type: string
+          enum: [minimum_indegree, by_directory, single_batch]
+        node_cleared:
+          type: string
+          description: "若 resolution == minimum_indegree，被清空 depends_on 的节点"
+
+  # ─── stage 4 review ──────────────────────────────────
+  review_docs:
+    type: array
+    description: "Stage 4 每轮需 Review 的全部文档 id（= architecture_docs + module_docs + flow_docs 的所有 id）"
+    items: { type: string }
+    minItems: 1
+
+  review_max_rounds:
+    type: integer
+    minimum: 1
+    maximum: 10
+    description: "small: 2 / medium: 5 / large: 5"
+
+  convergence_criteria:
+    type: object
+    required: [critical_max, medium_max]
+    properties:
+      critical_max:
+        type: integer
+        minimum: 0
+        const: 0
+        description: "硬编码为 0"
+      medium_max:
+        type: integer
+        minimum: 0
+        description: "small: 2 / medium: 4 / large: 4"
+
+  # ─── runtime ─────────────────────────────────────────
+  max_turns:
+    type: integer
+    minimum: 10
+    description: "small: 30 / medium/large: 50"
+
+  # ─── cost estimates（Stage C 计算后填入 header） ─────
+  cost_estimates:
+    type: object
+    properties:
+      n_total: { type: integer }
+      subagent_total: { type: integer }
+      subagent_stage4_max: { type: integer }
+      token_input_m: { type: number }
+      token_output_k: { type: number }
+      duration_est: { type: string, description: "自然语言，如 \"2-4h\"" }
+      quota_req: { type: string, description: "自然语言，如 \"15M tokens\"" }
+      time_window: { type: string, description: "自然语言，如 \"2h\"" }

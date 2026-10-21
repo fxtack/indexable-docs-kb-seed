@@ -1,0 +1,373 @@
+# AFMT-KB-SEED · Goal 2: kb-docs-bake · {{PROJECT_NAME}}
+
+> **执行方式**：本文档由 `/goal` 驱动执行。这是 Goal 1 Stage C 填充后的实例化版本——所有参数已确定，主 Agent 按参数分派 sub-agent，不做任何动态决策。
+> **不要**：不要修改本文档的参数章节（§参数）。修改会导致执行状态漂移。
+>
+> **元认知参考**：本任务文档回答"怎么做"。若需要理解**"为什么这样做"**——如为什么 Review sub-agent 全新不继承上下文、为什么主 Agent 只读统计不读发现明细、软收敛的设计动机——请先读 `.think-tank/afmt-kb-seed/DESIGN-planning.md`（尤其 §4、§9）。
+
+---
+
+## Goal 定义
+
+**goal_id**: `kb-docs-bake`
+**goal_name**: 知识库文档内容生成（Round 0）+ 多轮 Review 收敛
+**seed_pack_version**: `{{SEED_PACK_VERSION}}`
+**depends_on_goal**: `kb-primer`（必须已完成）
+
+---
+
+## 预计成本
+
+- **工程规模**：`{{PROJECT_SCALE}}`（{{SCALE_REASON}}）
+- **文档总数**：N_total = {{N_TOTAL}}（A={{N_A}}, M={{N_M}}, F={{N_F}}）
+- **Sub-agent 总数（估算）**：约 **{{SUBAGENT_TOTAL}} 个**（最坏情况；若 Review 提前收敛可减少 30-50%）
+  - Stage 3 文档生成：{{N_TOTAL}} 个
+  - Stage 4 Review：{{N_TOTAL}} × {{REVIEW_MAX_ROUNDS}} = {{SUBAGENT_STAGE4}} 个（上限）
+  - Stage 5 聚合：0-1 个
+- **Token 估算**：输入 ~{{TOKEN_INPUT_M}}M，输出 ~{{TOKEN_OUTPUT_K}}K
+- **预计耗时**：{{DURATION_EST}}（并发充分时）
+- **前置资源要求**：API 配额 ≥ {{QUOTA_REQ}}；建议 {{TIME_WINDOW}} 无中断时间窗口启动
+
+**中止条件**（用户可随时中止）：
+- 达到 `max_turns = {{MAX_TURNS}}` 轮上限
+- Sub-agent 累计失败率 > 20% 且重试无进展
+- 用户手动 Stop
+
+**建议**：启动前人类快速 review §参数.review_docs 中的文档清单，确认覆盖范围符合预期。
+
+---
+
+## Goal 条件（GOAL_MET）
+
+以下条件同时满足即达成：
+
+1. 所有 `{{N_TOTAL}}` 份文档已完整生成（每份的必填章节非空）
+2. Review 硬收敛（critical == 0 && medium < `{{CONVERGENCE_MEDIUM_MAX}}`），**或** 达到轮次上限进入软收敛状态
+3. `.think-tank/knowledge-base/pass/kb-build-qa.md` 已生成，包含所有 QA 条目 + 软收敛未解决项（若有）
+4. 本文档 Progress Log 中 Stage 3/4/5 三行状态均为 ✅
+
+达成后主 Agent 输出：
+
+**硬收敛**：
+```
+GOAL_MET: kb-docs-bake 完成。
+  文档 {{N_TOTAL}} 份，Review 硬收敛（{X} 轮）
+  QA 问题 {M} 项（含已 resolved {K} 项）—— **此时不要请人类回答**，QA 全局分诊留到 Goal 4。
+  下一步：直接启动 Goal 3 (kb-infra-setup) 搭建 KB 运行基础设施。
+    /goal .think-tank/afmt-kb-seed/AFMT-KB-SEED-infra-setup.md
+```
+
+**软收敛**：
+```
+GOAL_MET_WITH_WARNING: kb-docs-bake 达到轮次上限（{{REVIEW_MAX_ROUNDS}} 轮）
+  未解决：critical={X}, medium={Y}
+  详见 kb-build-qa.md 的 "Quality Warning" 章节
+  请人类决策：追加一轮定向 Review / 放宽阈值接受 / 标记文档为 draft
+  决策后仍继续 Goal 3 → Goal 4 完整流程（QA 未解决项会在 Goal 4 分诊时被 KB 全局视角复检）
+```
+
+---
+
+## 参数（Goal 1 填充，勿改）
+
+### project
+
+```yaml
+seed_pack_version: {{SEED_PACK_VERSION}}
+project_name: {{PROJECT_NAME}}
+project_scale: {{PROJECT_SCALE}}
+kb_root: .think-tank/knowledge-base
+```
+
+### excluded_paths
+
+由 Goal 1 Stage A1 识别、经人类 review 确认的第三方源码 / 生成产物 / submodule 路径。**Stage 3 / Stage 4 / Goal 3 Stage 8 均必须尊重此清单**——不生成文档、不上浮 module_header、不做 Review。
+
+```yaml
+excluded_paths:
+{{EXCLUDED_PATHS_YAML}}
+```
+
+字段结构：`- path: <路径或 glob>` / `reason: <一句话理由>` / `certainty: <high|medium|low>` / `needs_human_review: <bool，若人类已确认设为 false>`
+
+### document_lists
+
+```yaml
+architecture_docs:
+{{ARCHITECTURE_DOCS_YAML}}
+
+module_docs:
+{{MODULE_DOCS_YAML}}
+
+flow_docs:
+{{FLOW_DOCS_YAML}}
+```
+
+### stage3_batches
+
+```yaml
+# 每个 batch 是一次并行分派，内部 doc_id 之间无依赖或依赖已在前批完成
+{{STAGE3_BATCHES_YAML}}
+
+batch_concurrency: {{BATCH_CONCURRENCY}}
+```
+
+### stage4_review
+
+```yaml
+review_docs:  # 全部 A/F/M 文档，每轮全量 review
+{{REVIEW_DOCS_YAML}}
+
+review_max_rounds: {{REVIEW_MAX_ROUNDS}}
+
+convergence_criteria:
+  critical_max: 0
+  medium_max: {{CONVERGENCE_MEDIUM_MAX}}
+```
+
+### stage5_qa
+
+```yaml
+# 完整路径（v2.0.1 起严格规范）：所有 QA jsonl 必须落到 .think-tank/knowledge-base/pass/ 目录下
+qa_jsonl_pattern: ".think-tank/knowledge-base/pass/{doc_id}.qa.jsonl"
+qa_output: ".think-tank/knowledge-base/pass/kb-build-qa.md"
+```
+
+### runtime
+
+```yaml
+max_turns: {{MAX_TURNS}}
+journal_path: .think-tank/knowledge-base/pass/kb-seed-journal-kb-docs-bake.md
+```
+
+---
+
+## Stage 3: 文档内容生成（Round 0）
+
+### 3.1 逐 batch 分派
+
+主 Agent 按 §参数.stage3_batches 的顺序逐 batch 执行：
+
+```
+for batch in stage3_batches:
+  spawn_sub_agents_parallel(batch.docs, prompt_template="prompts/stage-3-subagent.md")
+  wait_all()
+  验证：每份文档的必填章节（frontmatter + 描述 + 至少 1 个正文章节）非空
+  更新 index.yaml（补充 sub-agent 产出的 keywords / description 修订)
+  Journal 追加 stage_completed 条目（batch 级别）
+```
+
+**每个 sub-agent 的 prompt 参数**（由主 Agent 从 §参数 中填入）：
+
+- `doc_id`, `doc_path`, `covers_code`（模块）/ `involves_modules`（流程）
+- `dep_docs`：`depends_on` 中已完成的模块文档路径列表（sub-agent 可引用但不重复内容）
+- `qa_jsonl_path`：**完整路径** `.think-tank/knowledge-base/pass/{doc_id}.qa.jsonl`（**必须完整路径**，不允许简写为 `pass/{doc_id}.qa.jsonl`。用 `qa_jsonl_pattern` 拼接 `doc_id` 后填入）
+
+> ⚠️ **主 Agent 分派责任**：sub-agent 会按拿到的 `qa_jsonl_path` 原样写入。若主 Agent 在分派时只传入了 `pass/xxx.qa.jsonl` 这种相对路径，sub-agent 会按自己的 CWD 解析，导致 pass 目录散落到各处（如 `.think-tank/knowledge-base/architecture/pass/`、工程根 `pass/` 等）。**分派参数必须**是以 `.think-tank/knowledge-base/pass/` 开头的完整路径。
+
+### 3.2 失败处理
+
+- Sub-agent 失败（超时/无效输出/API 错误）：主 Agent 重试最多 2 次
+- 重试时可缩小扫描范围（`adjusted_prompt` 字段记入 Journal）
+- 2 次仍失败：标记该文档为 `abandoned`，继续推进（在 Progress Log 中标记 ⚠️，Goal 3 汇总时会体现在 postmortem）
+
+### 3.3 Stage 3 收尾
+
+- 验证所有 `{{N_TOTAL}}` 份文档存在（含 abandoned 标记）
+- 更新 Progress Log：`Stage 3: ✅`
+
+---
+
+## Stage 4: 多轮 Review
+
+### 4.1 每轮全量 Review
+
+对 `review_docs` 中每份文档并行分派一个 Review sub-agent：
+
+```
+for round_num in 1..review_max_rounds:
+  Journal 追加 dispatch 条目（含轮次编号）
+  for doc in review_docs:
+    spawn_sub_agent(prompt="prompts/stage-4-subagent.md", params={doc_id, doc_path, covers_code, qa_jsonl_path, round_num})
+    # ⚠️ 主 Agent 分派责任：qa_jsonl_path 必须是完整路径，从 qa_jsonl_pattern 拼接得到
+    # 正确：qa_jsonl_path = ".think-tank/knowledge-base/pass/" + doc_id + ".qa.jsonl"
+    # 错误：qa_jsonl_path = "pass/" + doc_id + ".qa.jsonl"  ← 会导致 sub-agent 按 CWD 解析散落
+  wait_all()
+  统计：读取每个 .think-tank/knowledge-base/pass/{doc_id}.qa.jsonl，聚合本轮新增的 critical/medium/minor 数量
+  判断：
+    if critical == 0 && medium < convergence_criteria.medium_max:
+      硬收敛，跳出循环 → Stage 5
+    else:
+      记录本轮统计 → 下一轮
+```
+
+**关键约束**：
+- 每轮的 Review sub-agent 是全新的（不继承上一轮上下文）
+- 主 Agent **只读统计数字**（jsonl 行数按 severity 分组），不读 sub-agent 的完整发现（避免上下文污染）
+- Review sub-agent 追加到同一 jsonl，可将上一轮的条目标记 `resolved`
+
+### 4.2 达到轮次上限的软收敛兜底
+
+若跑完 `review_max_rounds` 轮仍未硬收敛：
+
+1. 主 Agent 汇总每份文档的未解决项：`{doc_id, severity, round_history, trend}`
+   - `round_history`：每轮该文档的 critical/medium 数量
+   - `trend`：`converging`（每轮减少） / `oscillating`（反复） / `growing`（增多）
+2. Journal 追加：`{action: decision, decision: soft_convergence, unresolved: {critical: X, medium: Y}}`
+3. 未解决项写入 kb-build-qa.md 的 "Quality Warning" 章节
+4. 主 Agent 输出 `GOAL_MET_WITH_WARNING`（见 §Goal 条件）
+5. 允许人类介入：追加定向 Review / 放宽阈值 / 标记 draft 文档
+
+### 4.3 Stage 4 收尾
+
+- 每轮结束后更新 Progress Log：`Stage 4 Round N: ✅`
+- 硬收敛或达到上限后：`Stage 4: ✅ (硬收敛 X 轮 / 软收敛)`
+
+---
+
+## Stage 5: QA 聚合
+
+### 5.1 扫描所有 QA jsonl 并合并
+
+主 Agent 直接执行（简单聚合，不需 sub-agent；文档数量大时可选择分派 1 个 sub-agent）：
+
+```
+for each .think-tank/knowledge-base/pass/{doc_id}.qa.jsonl:
+  读取所有行，每行是一个 QA 条目
+合并所有条目，按 severity 分组（critical / medium / minor）
+按 dimension 分类（architecture / module / flow / troubleshooting）
+标注 open vs resolved
+```
+
+**扫描散落文件（v2.0.1 新增）**：合并前，主 Agent 应执行一次全局扫描，检测是否有 sub-agent 违反路径规范导致散落：
+
+```bash
+# 检查工程根目录下的 pass/ 是否存在（v2.0.1 前的 Bug 可能导致）
+[ -d ./pass ] && echo "⚠️ 发现工程根目录下有 pass/，可能是散落"
+
+# 检查 .think-tank/knowledge-base/ 的子目录下是否有意外的 pass/
+find .think-tank/knowledge-base/ -mindepth 2 -type d -name 'pass' | grep -v '^\.think-tank/knowledge-base/pass$'
+
+# 检查其他位置是否有 .qa.jsonl 文件
+find . -name '*.qa.jsonl' -type f | grep -v '^\./\.think-tank/knowledge-base/pass/'
+```
+
+**处理散落**：
+- 若扫描到散落文件：主 Agent 记录到 Journal（`{action: error, error_type: qa_jsonl_scattered, files: [<list>]}`），然后**收拢**——将散落文件移动到 `.think-tank/knowledge-base/pass/` 后再执行合并
+- 若散落文件数 > 3：说明 Stage 3/4 sub-agent 大面积违规，建议中止 Stage 5 并触发 Stage 3/4 重跑（此时 sub-agent 的其他产出也可能有问题）
+
+### 5.2 输出 kb-build-qa.md
+
+结构：
+
+```markdown
+# {{PROJECT_NAME}} KB Build QA Report
+
+Generated at: <ISO 8601>
+Seed pack version: {{SEED_PACK_VERSION}}
+Review rounds: X（hard converged / soft converged）
+
+## Summary
+- Critical: {open_count} open / {resolved_count} resolved
+- Medium: {open_count} open / {resolved_count} resolved
+- Minor: {open_count} open / {resolved_count} resolved
+
+## Critical Issues（需人类紧急回答）
+### [doc_id-1] {问题描述}
+- File: modules/xxx.md §Y
+- Detected in round: 1
+- Status: open
+- Details: ...
+（若涉及代码歧义，附上 covers_code 中的关键符号名）
+
+## Medium Issues
+...
+
+## Minor Issues（可延后）
+...
+
+## Quality Warning（若软收敛）
+以下项达到 Review 轮次上限仍未解决：
+### [doc_id-2] {问题描述}
+- Severity: critical
+- Trend: oscillating
+- Round history: r1={critical:2, medium:0}, r2={critical:2, medium:1}, r3={critical:2, medium:1}
+- 建议处理方式：{...}
+
+## 回流指引
+人类回答后，Agent 需：
+1. 打开对应 knowledge-base/*.md 文档
+2. 根据回答修订正文
+3. 在 kb-build-qa.md 中将该条目标记 `resolved: true`
+```
+
+### 5.3 清理原始 jsonl（v1.2.0 新增）
+
+**动机**：`.think-tank/knowledge-base/pass/{doc_id}.qa.jsonl` 是构建期临时产物。合并到 `.think-tank/knowledge-base/pass/kb-build-qa.md` 后，它们信息已被完整吸收，继续保留只会污染 KB（pass/ 目录里出现几十份 doc-level jsonl 让人类难以定位真正需要关注的 kb-build-qa.md）。
+
+**清理规则**：
+
+1. **前置校验**（必须全部通过才允许清理）：
+   - `.think-tank/knowledge-base/pass/kb-build-qa.md` 已成功生成
+   - `kb-build-qa.md` 中总条目数 ≥ 所有 jsonl 行数之和（合并未丢失条目）
+   - `kb-build-qa.md` 各严重度计数与 jsonl 汇总一致
+   - §5.1 的散落文件扫描已完成且已收拢（无残余散落 jsonl）
+2. **执行删除**：
+
+   ```bash
+   # 只删除 .think-tank/knowledge-base/pass/ 目录下的 doc_id.qa.jsonl 模式文件
+   # 不影响 kb-build-qa.md / kb-seed-*.md / 其他 pass/ 内容
+   # 禁止递归删除或对其他目录执行删除
+   find .think-tank/knowledge-base/pass/ -maxdepth 1 -name '*.qa.jsonl' -delete
+   ```
+
+3. **Journal 记录**：追加条目 `{action: decision, decision: qa_jsonl_cleanup, deleted_count: <N>, kept_files: [kb-build-qa.md]}`
+
+**若前置校验失败**（合并逻辑异常）：
+- **不删除**任何 jsonl，主 Agent 输出 `GOAL_MET_WITH_WARNING`（Stage 5 已成功但清理跳过）
+- Journal 追加 error 条目，说明失败原因（行数不匹配 / 严重度计数不一致等）
+- 人类可手动 review 后决定是否清理
+
+**幂等性**：清理动作是幂等的——若 Goal 2 被重跑（如从中断恢复），jsonl 已被删除时清理静默跳过。
+
+### 5.4 Stage 5 收尾
+
+- 验证 `.think-tank/knowledge-base/pass/kb-build-qa.md` 存在
+- 验证 `.think-tank/knowledge-base/pass/` 下的 `{doc_id}.qa.jsonl` 全部已清理（若前置校验通过）
+- 验证工程根目录及其他位置**无遗留** `*.qa.jsonl`（散落收拢后应干净）
+- 更新 Progress Log：`Stage 5: ✅`
+- Journal 追加 `action: goal_completed`
+
+---
+
+## Progress Log
+
+<!-- 唯一权威状态源。每 Stage/Batch/Round 完成时重写对应行。 -->
+
+| Stage | 状态 | 开始时间 | 完成时间 | 耗时 | 备注 |
+|-------|------|---------|---------|------|------|
+| 3. 文档生成 | ⬜ | | | | |
+| 4. Review | ⬜ | | | | |
+| 5. QA 聚合 | ⬜ | | | | |
+
+**Stage 3 batch 明细**：
+
+| Batch | 状态 | 文档 | 完成时间 |
+|-------|------|------|---------|
+{{STAGE3_BATCH_PROGRESS_ROWS}}
+
+**Stage 4 round 明细**：
+
+| Round | 状态 | Critical | Medium | Minor | 完成时间 |
+|-------|------|----------|--------|-------|---------|
+| 1 | ⬜ | | | | |
+| 2 | ⬜ | | | | |
+{{STAGE4_ROUND_EXTRA_ROWS}}
+
+**Goal 状态**：⬜ pending
+
+---
+
+## 恢复协议
+
+见 `AFMT-KB-SEED-primer.md` 的恢复协议章节。区别：本 Goal 的 Journal 路径是 `.think-tank/knowledge-base/pass/kb-seed-journal-kb-docs-bake.md`。

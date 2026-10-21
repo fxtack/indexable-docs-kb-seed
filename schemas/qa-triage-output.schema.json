@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "urn:afmt-kb-seed:schema:qa-triage-output",
+  "title": "AFMT-KB-SEED QA Triage Sub-agent Output",
+  "description": "Goal 4 每个 sub-agent 对单个 kb-build-qa 问题做全局视角分诊后的输出。",
+  "type": "object",
+  "required": ["entry_id", "verdict", "confidence", "ai_answer", "kb_gaps"],
+  "properties": {
+    "entry_id": {
+      "type": "string",
+      "description": "对应 kb-build-qa.md 中的问题 id（sub-agent 收到的 QA_ENTRY_ID 参数）"
+    },
+    "verdict": {
+      "type": "string",
+      "enum": [
+        "fully_answered",
+        "partially_answered",
+        "cannot_answer_needs_human",
+        "should_not_be_a_question"
+      ],
+      "description": "分诊判定：4 档。判定必须严格按 prompt §严重度锚定示例。就低不就高（拿不准时选更保守/更需要人类介入的档位）。"
+    },
+    "confidence": {
+      "type": "string",
+      "enum": ["high", "medium", "low"],
+      "description": "对 verdict 的置信度。low 意味着 sub-agent 也拿不准，主 Agent 应对这类做交叉验证。"
+    },
+    "ai_answer": {
+      "type": "string",
+      "description": "sub-agent 通过 explore-kb 得到的答案。fully_answered 时是完整答案；partially_answered 时是已能回答的部分；其他情况可为空字符串。禁止编造：所有事实必须能追溯到 kb_sources。"
+    },
+    "kb_gaps": {
+      "type": "array",
+      "description": "KB 中缺失的具体信息点。partially_answered / cannot_answer_needs_human 时非空。每项一句话，说明缺什么。",
+      "items": {
+        "type": "string"
+      }
+    },
+    "kb_sources": {
+      "type": "array",
+      "description": "支撑 ai_answer 的 KB 文档路径 + 章节锚点。fully_answered 至少 1 项，partially_answered 至少 1 项，其他情况可为空。",
+      "items": {
+        "type": "object",
+        "required": ["path"],
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "相对于工程根目录的 KB 文档路径，如 .think-tank/knowledge-base/modules/rdb-persistence.md"
+          },
+          "section": {
+            "type": "string",
+            "description": "章节位置，如 §3.2 后台刷盘流程"
+          }
+        }
+      }
+    },
+    "suggested_kb_patch": {
+      "type": "object",
+      "description": "若 verdict 是 fully_answered / partially_answered，且 ai_answer 值得回填 KB，此字段给出 patch 建议。人类批准后由 /maintain-kb --apply-patches 落地。",
+      "properties": {
+        "target_file": {
+          "type": "string",
+          "description": "建议修改的 KB 文档路径"
+        },
+        "target_section": {
+          "type": "string",
+          "description": "建议追加/修改的章节"
+        },
+        "patch_type": {
+          "type": "string",
+          "enum": ["append", "insert", "revise"],
+          "description": "追加新段落 / 在特定位置插入 / 修订已有内容"
+        },
+        "content": {
+          "type": "string",
+          "description": "建议追加/替换的具体文字（Markdown 格式，用符号名锚定代码）"
+        },
+        "rationale": {
+          "type": "string",
+          "description": "为什么这样修改，一句话"
+        }
+      }
+    },
+    "should_not_be_reason": {
+      "type": "string",
+      "description": "verdict == should_not_be_a_question 时必填，说明为何该 QA 不成立。示例：'问题描述模糊无法定位' / '代码已重构该行为不再存在' / '重复问题（与 entry_id XX 语义相同）'"
+    },
+    "explore_kb_invocations": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "本次分诊过程中 sub-agent 调用 explore-kb 的次数（供 Journal 记录用于成本追溯）"
+    },
+    "notes": {
+      "type": "string",
+      "description": "可选。sub-agent 想额外说明的内容"
+    }
+  }
+}

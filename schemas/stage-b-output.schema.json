@@ -1,0 +1,251 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "urn:afmt-kb-seed:schema:stage-b-output",
+  "title": "AFMT-KB-SEED Stage B Sub-agent Output",
+  "description": "Stage B 的 sub-agent 输出结构。4 个维度共享此 schema，用 dimension 字段区分具体形态。",
+  "type": "object",
+  "required": ["dimension"],
+  "oneOf": [
+    { "$ref": "#/$defs/architectureOutput" },
+    { "$ref": "#/$defs/modulesOutput" },
+    { "$ref": "#/$defs/flowsOutput" },
+    { "$ref": "#/$defs/troubleshootingOutput" },
+    { "$ref": "#/$defs/errorOutput" }
+  ],
+  "$defs": {
+    "docEntryCommon": {
+      "type": "object",
+      "required": ["id", "title", "path", "description", "keywords"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+          "description": "kebab-case 唯一标识"
+        },
+        "title": { "type": "string", "minLength": 3 },
+        "path": {
+          "type": "string",
+          "pattern": "^(architecture|modules|flows)/[a-z0-9-]+\\.md$"
+        },
+        "description": { "type": "string", "minLength": 10 },
+        "keywords": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 2,
+          "maxItems": 15
+        },
+        "covers_code": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "相对于工程根目录的源文件路径"
+        }
+      }
+    },
+    "architectureOutput": {
+      "type": "object",
+      "required": ["dimension", "docs"],
+      "properties": {
+        "dimension": { "const": "architecture" },
+        "docs": {
+          "type": "array",
+          "items": {
+            "allOf": [
+              { "$ref": "#/$defs/docEntryCommon" },
+              {
+                "properties": {
+                  "depends_on": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "default": []
+                  }
+                }
+              }
+            ]
+          },
+          "minItems": 1
+        },
+        "notes": { "type": "string" }
+      }
+    },
+    "modulesOutput": {
+      "type": "object",
+      "required": ["dimension", "docs"],
+      "properties": {
+        "dimension": { "const": "modules" },
+        "docs": {
+          "type": "array",
+          "items": {
+            "allOf": [
+              { "$ref": "#/$defs/docEntryCommon" },
+              {
+                "required": ["depends_on", "responsibility", "capability_boundary", "communicates_with"],
+                "properties": {
+                  "depends_on": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "description": "本模块强依赖的其他模块 id"
+                  },
+                  "responsibility": {
+                    "type": "string",
+                    "minLength": 10,
+                    "description": "v2.0 起必填。一到两句话，产品视角职责，必须剥离技术专有名词。将写入 index.yaml.modules[<id>].responsibility 供 Commander skill 路由使用。"
+                  },
+                  "capability_boundary": {
+                    "type": "object",
+                    "required": ["does", "does_not"],
+                    "description": "v2.0 起必填。产品能力边界，供 Commander skill 影响链分析使用。",
+                    "properties": {
+                      "does": {
+                        "type": "array",
+                        "items": { "type": "string" },
+                        "minItems": 1,
+                        "description": "该模块承诺提供的能力清单"
+                      },
+                      "does_not": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "required": ["task", "owner"],
+                          "properties": {
+                            "task": {
+                              "type": "string",
+                              "description": "该模块明确不做的事"
+                            },
+                            "owner": {
+                              "type": "string",
+                              "description": "真正负责该 task 的模块 id（必填，不允许留空）"
+                            }
+                          }
+                        },
+                        "description": "该模块明确不做的事。每一项必须通过 owner 字段追溯到实际负责模块"
+                      }
+                    }
+                  },
+                  "communicates_with": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": ["module", "direction", "purpose"],
+                      "properties": {
+                        "module": {
+                          "type": "string",
+                          "description": "对端模块 id"
+                        },
+                        "direction": {
+                          "type": "string",
+                          "enum": ["调用", "被调用", "双向"],
+                          "description": "通讯方向"
+                        },
+                        "purpose": {
+                          "type": "string",
+                          "minLength": 5,
+                          "description": "一句话说明为什么需要这次通讯"
+                        }
+                      }
+                    },
+                    "description": "v2.0 起必填。模块间通讯关系，每项三要素完整"
+                  },
+                  "system_privilege": {
+                    "type": "string",
+                    "description": "可选。运行时权限级别（如 内核态 / 用户态 / 管理员权限）"
+                  },
+                  "lifecycle": {
+                    "type": "string",
+                    "description": "可选。触发方式与生命周期（如 随系统启动常驻 / 按需一次性）"
+                  }
+                }
+              }
+            ]
+          },
+          "minItems": 1
+        },
+        "circular_dependencies_observed": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "cycle": {
+                "type": "array",
+                "items": { "type": "string" }
+              }
+            }
+          },
+          "default": []
+        },
+        "notes": { "type": "string" }
+      }
+    },
+    "flowsOutput": {
+      "type": "object",
+      "required": ["dimension", "docs"],
+      "properties": {
+        "dimension": { "const": "flows" },
+        "docs": {
+          "type": "array",
+          "items": {
+            "allOf": [
+              { "$ref": "#/$defs/docEntryCommon" },
+              {
+                "required": ["involves_modules"],
+                "properties": {
+                  "involves_modules": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "minItems": 1,
+                    "description": "涉及的模块 id 列表（必须在 modulesOutput.docs 中存在）"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "notes": { "type": "string" }
+      }
+    },
+    "troubleshootingOutput": {
+      "type": "object",
+      "required": ["dimension", "setup"],
+      "properties": {
+        "dimension": { "const": "troubleshooting" },
+        "setup": {
+          "type": "object",
+          "required": ["symptom_index_file", "faq_file", "known_bugs_file", "runbooks_dir", "incidents_dir"],
+          "properties": {
+            "symptom_index_file": { "type": "string" },
+            "faq_file": { "type": "string" },
+            "known_bugs_file": { "type": "string" },
+            "runbooks_dir": { "type": "string" },
+            "incidents_dir": { "type": "string" }
+          }
+        },
+        "initial_symptoms_identified": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "trigger_keywords"],
+            "properties": {
+              "id": { "type": "string" },
+              "trigger_keywords": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "runbook": { "type": "string" }
+            }
+          }
+        },
+        "notes": { "type": "string" }
+      }
+    },
+    "errorOutput": {
+      "type": "object",
+      "required": ["error"],
+      "properties": {
+        "error": {
+          "type": "string",
+          "enum": ["no_modules_identified", "file_write_error", "invalid_project_root", "read_failure"]
+        },
+        "detail": { "type": "string" }
+      }
+    }
+  }
+}
