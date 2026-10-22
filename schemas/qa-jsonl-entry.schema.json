@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft-07/schema#",
-  "$id": "urn:afmt-kb-seed:schema:qa-jsonl-entry",
-  "title": "AFMT-KB-SEED QA JSONL Entry",
+  "$id": "urn:indexable-docs-kb:schema:qa-jsonl-entry",
+  "title": "Indexable Docs KB Seed QA JSONL Entry",
   "description": "本文件规范 .think-tank/knowledge-base/pass/{doc_id}.qa.jsonl 中每一行的格式。Stage 3 生成时写入 round=0；Stage 4 每轮 Review 追加对应 round。**文件路径硬性约束（v2.0.1）**：QA jsonl 文件必须写入 .think-tank/knowledge-base/pass/ 目录下，路径必须以 .think-tank/knowledge-base/pass/ 开头，不允许 pass/{doc_id}.qa.jsonl（相对路径）或 .think-tank/knowledge-base/architecture/pass/... 等散落位置。",
   "type": "object",
   "required": ["round", "doc_id", "location", "severity", "type", "question", "status"],

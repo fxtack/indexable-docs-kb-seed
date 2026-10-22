@@ -1,9 +1,9 @@
-# AFMT-KB-SEED · Goal 3: kb-infra-setup
+# Indexable Docs KB Seed · Goal 3: kb-infra-setup
 
 > **执行方式**：本文档由 `/goal` 驱动执行。全部为文件系统操作（复制、创建、写入），主 Agent 可自主完成大部分工作；仅 KB README、postmortem 汇总需分派 sub-agent。
 > **前提**：Goal 2 (kb-docs-bake) 必须已完成。
 >
-> **元认知参考**：本任务文档回答"怎么做"。若需要理解**"为什么这样做"**——如为什么 Goal 3 单列一 Goal、为什么不再有独立的 Commander 内容构建 Stage（产品视角边界字段已由 Stage B 直接产出并写入 index.yaml）、两种 QA 机制的分工——请先读 `.think-tank/afmt-kb-seed/DESIGN-planning.md`（尤其 §5）。
+> **元认知参考**：本任务文档回答"怎么做"。若需要理解**"为什么这样做"**——如为什么 Goal 3 单列一 Goal、为什么不再有独立的 Commander 内容构建 Stage（产品视角边界字段已由 Stage B 直接产出并写入 index.yaml）、两种 QA 机制的分工——请先读 `.think-tank/indexable-docs-kb-seed/DESIGN-planning.md`（尤其 §5）。
 
 ---
 
@@ -11,7 +11,7 @@
 
 **goal_id**: `kb-infra-setup`
 **goal_name**: KB 运行基础设施搭建 + Skill 迁移
-**seed_pack_version**: `<从 .think-tank/afmt-kb-seed/VERSION 读取>`
+**seed_pack_version**: `<从 .think-tank/indexable-docs-kb-seed/VERSION 读取>`
 **depends_on_goal**: `kb-docs-bake`
 
 ---
@@ -51,13 +51,13 @@ GOAL_MET: kb-infra-setup 完成。
   产品视角边界字段：<N> 个模块（Goal 2 Stage B 已产出并写入 index.yaml.modules[]）
   Postmortem: pass/kb-seed-postmortem.md
   Summary: pass/kb-seed-summary.md
-  KB 基础设施已就绪，但 AFMT-KB-SEED **完整构建周期尚未收官**。
+  KB 基础设施已就绪，但种子包**完整构建周期尚未收官**。
 
   **下一步：启动 Goal 4 (kb-qa-triage) 完成 QA 全局分诊**
-    /goal .think-tank/afmt-kb-seed/AFMT-KB-SEED-qa-triage.md
+    /goal .think-tank/indexable-docs-kb-seed/qa-triage.md
 
   Goal 4 会用 KB 全局视角尝试回答 kb-build-qa.md 中的每个 QA 问题，把人类必须回答的问题精准圈出来（通常能减少 30-60% 的人类回答负担）。
-  除非人类显式跳过或 explore-kb 未安装，主 Agent 应默认启动 Goal 4。跳过路径见 AFMT-KB-SEED-qa-triage.md §与人类回答阶段的关系。
+  除非人类显式跳过或 explore-kb 未安装，主 Agent 应默认启动 Goal 4。跳过路径见 qa-triage.md §与人类回答阶段的关系。
 ```
 
 ---
@@ -69,9 +69,9 @@ GOAL_MET: kb-infra-setup 完成。
 - 验证 `.think-tank/knowledge-base/index.yaml` 存在（Goal 1 产出）
 - 验证 `index.yaml.modules[]` 中至少 1 项含 `responsibility` 字段（Goal 1 Stage B 应已产出产品视角字段）
 - 验证 `.think-tank/knowledge-base/pass/kb-build-qa.md` 存在（Goal 2 产出）
-- 验证 `.think-tank/afmt-kb-seed/skills/` 目录存在（种子包应含 explore-kb / maintain-kb / commander 三个 skill）
-- 验证 `.think-tank/afmt-kb-seed/skills/commander/SKILL.md` 存在（种子包应含 Commander skill 模板。若缺失，说明种子包不完整，应重新复制种子包）
-- 读取 `.think-tank/afmt-kb-seed/VERSION` 获得 `seed_pack_version`
+- 验证 `.think-tank/indexable-docs-kb-seed/skills/` 目录存在（种子包应含 explore-kb / maintain-kb / commander 三个 skill）
+- 验证 `.think-tank/indexable-docs-kb-seed/skills/commander/SKILL.md` 存在（种子包应含 Commander skill 模板。若缺失，说明种子包不完整，应重新复制种子包）
+- 读取 `.think-tank/indexable-docs-kb-seed/VERSION` 获得 `seed_pack_version`
 - 读取 `index.yaml.meta.project_name` 获得 `{{PROJECT_NAME}}`
 - 从 `{{PROJECT_NAME}}` 派生 `{{PROJECT_SLUG}}`：小写化 + 特殊字符替换为连字符，如 `Redis` → `redis`
 
@@ -112,7 +112,7 @@ mkdir -p .claude/skills
 - .think-tank/knowledge-base/index.yaml（了解 KB 全貌 + 产品视角边界字段）
 - .think-tank/knowledge-base/.meta-knowledge-base-guide.md（了解构建规范）
 - CLAUDE.md（了解工程背景）
-- 模板骨架：.think-tank/afmt-kb-seed/templates/kb-readme.md.template
+- 模板骨架：.think-tank/indexable-docs-kb-seed/templates/kb-readme.md.template
 
 输出 .think-tank/knowledge-base/README.md，需包含：
 1. 本知识库的定位与使用场景（1-2 段）
@@ -145,14 +145,14 @@ mkdir -p .claude/skills
 主 Agent 直接执行（纯文件复制）：
 
 ```bash
-cp -r .think-tank/afmt-kb-seed/skills/explore-kb .claude/skills/
-cp -r .think-tank/afmt-kb-seed/skills/maintain-kb .claude/skills/
+cp -r .think-tank/indexable-docs-kb-seed/skills/explore-kb .claude/skills/
+cp -r .think-tank/indexable-docs-kb-seed/skills/maintain-kb .claude/skills/
 ```
 
 ### 7.2 复制 knowledge-extract-qa-guide
 
 ```bash
-cp .think-tank/afmt-kb-seed/knowledge-extract-qa-guide.md \
+cp .think-tank/indexable-docs-kb-seed/knowledge-extract-qa-guide.md \
    .think-tank/knowledge-base/knowledge-extract-qa-guide.md
 ```
 
@@ -163,7 +163,7 @@ cp .think-tank/afmt-kb-seed/knowledge-extract-qa-guide.md \
 **步骤 1：复制 Commander skill 到目标位置**
 
 ```bash
-cp -r .think-tank/afmt-kb-seed/skills/commander \
+cp -r .think-tank/indexable-docs-kb-seed/skills/commander \
       .claude/skills/{{PROJECT_SLUG}}-commander
 ```
 
@@ -271,7 +271,7 @@ Commander 模板分两层，迁移时只处理模板层，**不逐个重写示�
 分派 sub-agent，prompt：
 
 ```
-汇总 AFMT-KB-SEED 本次构建的完整过程记录。
+汇总本次构建的完整过程记录。
 
 输入：
 - .think-tank/knowledge-base/pass/kb-seed-journal-kb-primer.md
@@ -310,7 +310,7 @@ Commander 模板分两层，迁移时只处理模板层，**不逐个重写示�
 主 Agent 生成 `.think-tank/knowledge-base/pass/kb-seed-summary.md`：
 
 ```markdown
-# AFMT-KB-SEED 构建完成摘要 · {{project_name}}
+# 知识库构建完成摘要 · {{project_name}}
 
 **构建时间**：{start_time} → {end_time}（耗时 {duration}）
 **种子包版本**：{seed_pack_version}
@@ -337,9 +337,9 @@ Commander 模板分两层，迁移时只处理模板层，**不逐个重写示�
 
 ## 下一步行动
 
-**AFMT-KB-SEED 完整构建周期是 Goal 1 → Goal 2 → Goal 3 → Goal 4，本 Goal 完成后应默认继续 Goal 4**：
+**种子包完整构建周期是 Goal 1 → Goal 2 → Goal 3 → Goal 4，本 Goal 完成后应默认继续 Goal 4**：
 
-1. **[标准流程] 启动 Goal 4 (kb-qa-triage)**：`/goal .think-tank/afmt-kb-seed/AFMT-KB-SEED-qa-triage.md`
+1. **[标准流程] 启动 Goal 4 (kb-qa-triage)**：`/goal .think-tank/indexable-docs-kb-seed/qa-triage.md`
    - Goal 4 用 KB 全局视角尝试回答 kb-build-qa.md 中每个 QA 问题，输出 4 档分诊 + KB patch 建议
    - 通常能减少 30-60% 的人类回答负担
 2. Goal 4 完成后：人类 review `pass/kb-doc-patches.md` 决定是否 apply；然后回答 partially_answered + cannot_answer_needs_human 项
@@ -352,7 +352,7 @@ Commander 模板分两层，迁移时只处理模板层，**不逐个重写示�
 - 人类显式要求跳过
 - explore-kb skill 未安装（依赖失败）
 - Goal 4 累计触发 GOAL_ABANDONED
-详见 `AFMT-KB-SEED-qa-triage.md §与人类回答阶段的关系`。
+详见 `qa-triage.md §与人类回答阶段的关系`。
 ```
 
 ### 8.4 Stage 8 收尾
@@ -378,7 +378,7 @@ Commander 模板分两层，迁移时只处理模板层，**不逐个重写示�
 
 ## 恢复协议
 
-见 `AFMT-KB-SEED-primer.md` 的恢复协议章节。Goal 3 的 Journal 路径：`pass/kb-seed-journal-kb-infra-setup.md`。
+见 `primer.md` 的恢复协议章节。Goal 3 的 Journal 路径：`pass/kb-seed-journal-kb-infra-setup.md`。
 
 由于 Goal 3 大部分是幂等文件操作，恢复时可直接重跑各 Stage（跳过已完成项由 mkdir/cp 的 idempotent 特性保证）。
 

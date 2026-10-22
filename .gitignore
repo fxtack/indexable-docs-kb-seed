@@ -4,3 +4,6 @@ FINDINGS-*.md
 # OS / 编辑器
 .DS_Store
 *.swp
+
+# 临时任务文档（不提交）
+TASK-*.md

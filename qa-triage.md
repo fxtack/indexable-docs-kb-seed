@@ -1,10 +1,10 @@
-# AFMT-KB-SEED · Goal 4: kb-qa-triage
+# Indexable Docs KB Seed · Goal 4: kb-qa-triage
 
 > **执行方式**：本文档由 `/goal` 驱动执行。核心动作是**批并行**地对 kb-build-qa.md 中的每个 QA 问题分派一个隔离的 sub-agent，用 explore-kb 尝试回答，最终把 kb-build-qa.md 重组为 4 档分诊结果。
 > **前提**：Goal 3 (kb-infra-setup) 必须已完成——explore-kb / commander skill 都已安装，KB 内容完整可检索。
-> **位置**：Goal 4 是 AFMT-KB-SEED 完整构建周期的**最后一环**（Goal 1 → Goal 2 → Goal 3 → **Goal 4**）。默认执行——Goal 3 GOAL_MET 之后主 Agent 应直接启动本 Goal。仅当人类**显式**要求跳过、或本 Goal 触发出工条件时才允许绕过（详见 §与降级出口）。
+> **位置**：Goal 4 是种子包完整构建周期的**最后一环**（Goal 1 → Goal 2 → Goal 3 → **Goal 4**）。默认执行——Goal 3 GOAL_MET 之后主 Agent 应直接启动本 Goal。仅当人类**显式**要求跳过、或本 Goal 触发出工条件时才允许绕过（详见 §出工条件（GOAL_ABANDONED））。
 >
-> **元认知参考**：本任务文档回答"怎么做"。若需要理解**"为什么要做 Goal 4"**——jsonl 生成阶段是局部视角、Goal 3 完成后 KB 已全局互联、此时值得做一次全局回答尝试来减少人类回答负担——请先读 `.think-tank/afmt-kb-seed/DESIGN-planning.md` §6。
+> **元认知参考**：本任务文档回答"怎么做"。若需要理解**"为什么要做 Goal 4"**——jsonl 生成阶段是局部视角、Goal 3 完成后 KB 已全局互联、此时值得做一次全局回答尝试来减少人类回答负担——请先读 `.think-tank/indexable-docs-kb-seed/DESIGN-planning.md` §6。
 
 ---
 
@@ -12,7 +12,7 @@
 
 **goal_id**: `kb-qa-triage`
 **goal_name**: 全局视角 QA 分诊，把 kb-build-qa 分为 4 档
-**seed_pack_version**: `<从 .think-tank/afmt-kb-seed/VERSION 读取>`
+**seed_pack_version**: `<从 .think-tank/indexable-docs-kb-seed/VERSION 读取>`
 **depends_on_goal**: `kb-infra-setup`
 **position**: `KB 构建周期的最后一环（Goal 1-4 的第 4 步）`
 **default_behavior**: `Goal 3 完成后主 Agent 默认启动本 Goal，不询问人类是否执行；仅当人类显式要求跳过时才绕过`
@@ -32,7 +32,7 @@
 达成后主 Agent 输出：
 
 ```
-GOAL_MET: kb-qa-triage 完成。AFMT-KB-SEED 完整构建周期 (Goal 1-4) 已收官。
+GOAL_MET: kb-qa-triage 完成。种子包完整构建周期 (Goal 1-4) 已收官。
   原始 QA 问题：{N} 项
   分诊结果：
     fully_answered           : {A} 项（KB 已能回答，可选审阅）
@@ -52,7 +52,7 @@ GOAL_MET: kb-qa-triage 完成。AFMT-KB-SEED 完整构建周期 (Goal 1-4) 已�
 
 ## 出工条件（GOAL_ABANDONED）
 
-以下任一条件触发即降级出出工（**注意**：这是**降级出口**，不是常规路径。Goal 4 是默认标准流程，只有在真的无法推进时才走此分支）：
+以下任一条件触发即降级出工（**注意**：这是**降级出口**，不是常规路径。Goal 4 是默认标准流程，只有在真的无法推进时才走此分支）：
 
 - 累计轮次 > 30
 - Sub-agent 累计失败率 > 30% 且重试无进展
@@ -64,7 +64,7 @@ GOAL_MET: kb-qa-triage 完成。AFMT-KB-SEED 完整构建周期 (Goal 1-4) 已�
 ```
 GOAL_ABANDONED: {原因}
   Goal 4 未完成。可基于 pass/kb-build-qa-pre-goal4.md 直接进入人工回答阶段（该文件是 Stage 10.1 的原始 kb-build-qa.md 备份，若 Stage 10.1 未执行则直接用 pass/kb-build-qa.md）。
-  若因资源不足暂时降级，可在后续任意时刻重新 /goal .think-tank/afmt-kb-seed/AFMT-KB-SEED-qa-triage.md 重启 Goal 4。
+  若因资源不足暂时降级，可在后续任意时刻重新 /goal .think-tank/indexable-docs-kb-seed/qa-triage.md 重启 Goal 4。
 ```
 
 ---
@@ -76,7 +76,7 @@ GOAL_ABANDONED: {原因}
 - 验证 `pass/kb-build-qa.md` 存在（Goal 2 Stage 5 产出）
 - 验证 `.claude/skills/explore-kb/SKILL.md` 存在（Goal 3 Stage 7 迁移）
 - 验证 `.claude/skills/{{PROJECT_SLUG}}-commander/SKILL.md` 存在（可选，若装了 commander 可辅助分诊）
-- 读取 `.think-tank/afmt-kb-seed/VERSION` 获得 `seed_pack_version`
+- 读取 `.think-tank/indexable-docs-kb-seed/VERSION` 获得 `seed_pack_version`
 
 任一必选缺失即终止：`GOAL_ABANDONED: 前置条件不满足，缺失 {file}`。
 
@@ -145,7 +145,7 @@ for batch in batches:
 - `QA_CODE_REFERENCE`：关联代码符号（若有）
 - `EXPLORE_KB_AVAILABLE`：`true`
 
-Prompt 模板：`.think-tank/afmt-kb-seed/prompts/stage-qa-triage-subagent.md`
+Prompt 模板：`.think-tank/indexable-docs-kb-seed/prompts/stage-qa-triage-subagent.md`
 
 ### 11.3 失败处理
 
@@ -325,7 +325,7 @@ Total patches: {P}
 
 ## 恢复协议
 
-见 `AFMT-KB-SEED-primer.md` 的恢复协议章节。Goal 4 的 Journal 路径：`pass/kb-seed-journal-kb-qa-triage.md`。
+见 `primer.md` 的恢复协议章节。Goal 4 的 Journal 路径：`pass/kb-seed-journal-kb-qa-triage.md`。
 
 由于 Stage 10（备份 + 解析）与 Stage 12（重组）都是主 Agent 幂等动作，Stage 11 的 sub-agent 也是无状态的（每次 fresh），Goal 4 高度可恢复：从 Journal 中最后一个成功 batch 之后继续即可。
 
@@ -333,7 +333,7 @@ Total patches: {P}
 
 ## 与人类回答阶段的关系
 
-Goal 4 是 **AFMT-KB-SEED 完整构建周期的最后一环**（Goal 1-4 的第 4 步），**默认执行**——Goal 3 GOAL_MET 之后主 Agent 无需询问人类，直接启动本 Goal。
+Goal 4 是 **种子包完整构建周期的最后一环**（Goal 1-4 的第 4 步），**默认执行**——Goal 3 GOAL_MET 之后主 Agent 无需询问人类，直接启动本 Goal。
 
 **Goal 4 与人类回答阶段的分工**：
 
@@ -355,7 +355,7 @@ Goal 4 是 **AFMT-KB-SEED 完整构建周期的最后一环**（Goal 1-4 的第 
 
 ```
 Goal 4 已跳过（原因：{显式跳过 | explore-kb 缺失 | 其他}）
-AFMT-KB-SEED 构建周期到 Goal 3 结束。
+种子包构建周期到 Goal 3 结束。
   人类可直接基于 pass/kb-build-qa.md 回答 QA 问题
-  若后续想补跑分诊，随时可 /goal .think-tank/afmt-kb-seed/AFMT-KB-SEED-qa-triage.md 重启 Goal 4
+  若后续想补跑分诊，随时可 /goal .think-tank/indexable-docs-kb-seed/qa-triage.md 重启 Goal 4
 ```

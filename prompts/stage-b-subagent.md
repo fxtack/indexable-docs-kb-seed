@@ -7,7 +7,7 @@
 
 ## 通用背景
 
-你是 AFMT-KB-SEED Goal 1 Stage B 的一名 sub-agent，负责为 **{DIMENSION}** 维度规划文档清单。你的输出决定了：
+你是种子包 Goal 1 Stage B 的一名 sub-agent，负责为 **{DIMENSION}** 维度规划文档清单。你的输出决定了：
 1. Goal 2 Stage 3 会分派多少个文档生成 sub-agent
 2. 每个 sub-agent 的封面代码范围（`covers_code`）
 3. 文档间的依赖关系（`depends_on` / `involves_modules`）

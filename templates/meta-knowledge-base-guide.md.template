@@ -223,7 +223,7 @@ Commander skill 使用 `index.yaml.modules[].{responsibility, capability_boundar
 
 ```yaml
 meta:
-  seed_pack_version: "2.0.0"       # 生成本 KB 的 AFMT-KB-SEED 种子包版本
+  seed_pack_version: "2.0.0"       # 生成本 KB 的种子包版本
   seed_pack_build: "YYYY-MM-DD"    # 种子包发布日期
   kb_schema_version: "2.0"         # KB 结构 schema 版本（v2.0 起 modules[] 含产品视角字段）
   built_at: "YYYY-MM-DDTHH:MM:SS+TZ"  # 本次构建时间

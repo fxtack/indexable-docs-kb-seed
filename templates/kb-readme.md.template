@@ -104,4 +104,4 @@
 - [Incident Record 规范](troubleshooting/incidents/.meta-incident-guide.md)
 - [隐性知识提取 QA 工作流](knowledge-extract-qa-guide.md)
 
-**版本**：由 AFMT-KB-SEED 种子包 v{{SEED_PACK_VERSION}} 于 {{BUILT_AT}} 构建。版本契约详见 `index.yaml.meta`。
+**版本**：由种子包 v{{SEED_PACK_VERSION}} 于 {{BUILT_AT}} 构建。版本契约详见 `index.yaml.meta`。

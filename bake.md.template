@@ -1,9 +1,9 @@
-# AFMT-KB-SEED · Goal 2: kb-docs-bake · {{PROJECT_NAME}}
+# Indexable Docs KB Seed · Goal 2: kb-docs-bake · {{PROJECT_NAME}}
 
 > **执行方式**：本文档由 `/goal` 驱动执行。这是 Goal 1 Stage C 填充后的实例化版本——所有参数已确定，主 Agent 按参数分派 sub-agent，不做任何动态决策。
 > **不要**：不要修改本文档的参数章节（§参数）。修改会导致执行状态漂移。
 >
-> **元认知参考**：本任务文档回答"怎么做"。若需要理解**"为什么这样做"**——如为什么 Review sub-agent 全新不继承上下文、为什么主 Agent 只读统计不读发现明细、软收敛的设计动机——请先读 `.think-tank/afmt-kb-seed/DESIGN-planning.md`（尤其 §4、§9）。
+> **元认知参考**：本任务文档回答"怎么做"。若需要理解**"为什么这样做"**——如为什么 Review sub-agent 全新不继承上下文、为什么主 Agent 只读统计不读发现明细、软收敛的设计动机——请先读 `.think-tank/indexable-docs-kb-seed/DESIGN-planning.md`（尤其 §4、§9）。
 
 ---
 
@@ -54,7 +54,7 @@ GOAL_MET: kb-docs-bake 完成。
   文档 {{N_TOTAL}} 份，Review 硬收敛（{X} 轮）
   QA 问题 {M} 项（含已 resolved {K} 项）—— **此时不要请人类回答**，QA 全局分诊留到 Goal 4。
   下一步：直接启动 Goal 3 (kb-infra-setup) 搭建 KB 运行基础设施。
-    /goal .think-tank/afmt-kb-seed/AFMT-KB-SEED-infra-setup.md
+    /goal .think-tank/indexable-docs-kb-seed/infra-setup.md
 ```
 
 **软收敛**：
@@ -370,4 +370,4 @@ Review rounds: X（hard converged / soft converged）
 
 ## 恢复协议
 
-见 `AFMT-KB-SEED-primer.md` 的恢复协议章节。区别：本 Goal 的 Journal 路径是 `.think-tank/knowledge-base/pass/kb-seed-journal-kb-docs-bake.md`。
+见 `primer.md` 的恢复协议章节。区别：本 Goal 的 Journal 路径是 `.think-tank/knowledge-base/pass/kb-seed-journal-kb-docs-bake.md`。

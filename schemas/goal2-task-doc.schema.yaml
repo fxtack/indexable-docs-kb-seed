@@ -1,9 +1,9 @@
-# AFMT-KB-SEED Goal 2 Task Document Schema
-# 描述 Goal 1 Stage C 填充 AFMT-KB-SEED-bake.md.template 时的参数结构。
+# Indexable Docs KB Seed Goal 2 Task Document Schema
+# 描述 Goal 1 Stage C 填充 bake.md.template 时的参数结构。
 # 主 Agent 在填充模板前，应先构造符合此 schema 的参数对象。
 
 $schema: "http://json-schema.org/draft-07/schema#"
-title: "AFMT-KB-SEED Goal 2 Task Document Parameters"
+title: "Indexable Docs KB Seed Goal 2 Task Document Parameters"
 type: object
 required:
   - seed_pack_version
@@ -24,7 +24,7 @@ properties:
   seed_pack_version:
     type: string
     pattern: "^\\d+\\.\\d+\\.\\d+$"
-    description: "从 .think-tank/afmt-kb-seed/VERSION 读取"
+    description: "从 .think-tank/indexable-docs-kb-seed/VERSION 读取"
 
   project_name:
     type: string

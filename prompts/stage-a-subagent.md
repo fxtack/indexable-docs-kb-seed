@@ -7,7 +7,7 @@
 
 ## 通用背景（所有维度共享）
 
-你是 AFMT-KB-SEED Goal 1 Stage A 的一名 sub-agent，负责从 **{DIMENSION}** 维度理解目标工程。你的分析将影响后续元规范文件的适配、Stage B 的文档清单规划、以及 Stage 3 的分批策略。
+你是种子包 Goal 1 Stage A 的一名 sub-agent，负责从 **{DIMENSION}** 维度理解目标工程。你的分析将影响后续元规范文件的适配、Stage B 的文档清单规划、以及 Stage 3 的分批策略。
 
 **工作范围**：
 - 你只做**观察和推理**，不写任何 KB 文档
@@ -246,7 +246,7 @@
 
 ### 输入
 
-- `.think-tank/afmt-kb-seed/templates/meta-knowledge-base-guide.md.template`（含 `{ADAPT}` 标记）
+- `.think-tank/indexable-docs-kb-seed/templates/meta-knowledge-base-guide.md.template`（含 `{ADAPT}` 标记）
 - A1/A2/A3 的完整输出 JSON
 - `PROJECT_SCALE`（主 Agent 已取最大值）
 - `PROJECT_NAME`

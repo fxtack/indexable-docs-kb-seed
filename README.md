@@ -1,8 +1,10 @@
-# AFMT-KB-SEED 种子包
+# Indexable Docs KB Seed
 
-> 一套可分发到任意 git 工程的、结构化的任务描述文档集合。目标工程的 AI Agent 读取后，能自主为该工程构建等价的 AFMT 知识库（Architecture / Flows / Modules / Troubleshooting）。
+> 一套可分发到任意 git 工程的结构化任务描述文档集合。目标工程的 AI Agent 读取后，能自主为该工程构建一份可检索、可维护的知识库。
 
-**AFMT** 是知识库的核心维度：Architecture（架构层）/ Flows（跨模块流程）/ Modules（模块权威源）/ Troubleshooting（排障）。种子包围绕这四个维度组织文档生成流程。
+知识库的默认四维记作 **AFMT**：Architecture（架构层）/ Flows（跨模块流程）/ Modules（模块权威源）/ Troubleshooting（排障）。
+
+这四维是**默认组织方式**，但包名与协议不把知识结构永久绑定在四维上。**当前实现的协议仍按四维落地**（Stage B 分派四个维度 sub-agent、`index.yaml` 四段结构、schema 中 `dimension` 为固定枚举）；因此增删维度属于**协议变更**，须同步调整 Stage B 分派、`schemas/stage-b-output.schema.json`、`bake.md.template` 的文档清单与成本口径、以及 Goal 1 的 `GOAL_MET` 判定。
 
 ## 使用方式
 
@@ -20,12 +22,13 @@
 #     理解为什么是四个 Goal、为什么 Stage A 要多维度取最大值、为什么要软收敛兜底……
 #     知道 "why" 后遇到边缘情况才能合理判断，而不是死板套用任务文档
 
-# 1. 复制种子包到目标工程根目录
-cp -r afmt-kb-seed /path/to/target-project/.think-tank/
+# 1. 复制种子包到目标工程的 .think-tank/ 下（目录不存在时先创建）
+mkdir -p /path/to/target-project/.think-tank
+cp -r indexable-docs-kb-seed /path/to/target-project/.think-tank/
 
 # 2. 进入目标工程，启动 Goal 1
 cd /path/to/target-project
-# 在 Claude Code 中：/goal .think-tank/afmt-kb-seed/AFMT-KB-SEED-primer.md
+# 在 Claude Code 中：/goal .think-tank/indexable-docs-kb-seed/primer.md
 
 # 3. Goal 1 完成后会生成实例化的 Goal 2 任务文档，人类可 review 文档清单和"预计成本"章节，
 #    然后启动 Goal 2 → Goal 3 → Goal 4
@@ -41,10 +44,10 @@ cd /path/to/target-project
 | `VERSION` | 版本标识 | 单行版本号，Goal 1 会读取并写入 index.yaml.meta.seed_pack_version |
 | `CHANGELOG.md` | 变更记录 | 各版本破坏性变更与迁移指南 |
 | `DESIGN-planning.md` | 设计参考文档 | 种子包的完整设计规划（v8-ready）。**Agent 拿到种子包后应先通读此文档建立元认知**——理解每个 Goal / Stage / 决策的"为什么"，而不是仅照任务文档的"怎么做"执行 |
-| `AFMT-KB-SEED-primer.md` | Goal 1 任务文档 | 直接被 `/goal` 驱动执行 |
-| `AFMT-KB-SEED-bake.md.template` | Goal 2 模板 | Goal 1 Stage C 填充参数后生成 `AFMT-KB-SEED-bake-{project}.md` |
-| `AFMT-KB-SEED-infra-setup.md` | Goal 3 任务文档 | 基础设施搭建 + Skill 迁移（Stage 6 目录补齐 → Stage 7 Skill 迁移 → Stage 8 完整性检查） |
-| `AFMT-KB-SEED-qa-triage.md` | Goal 4 任务文档 | 全局视角 QA 分诊，将 kb-build-qa 分为 4 档。**AFMT-KB-SEED 完整构建周期的最后一环，默认执行**（无需人类确认） |
+| `primer.md` | Goal 1 任务文档 | 直接被 `/goal` 驱动执行 |
+| `bake.md.template` | Goal 2 模板 | Goal 1 Stage C 填充参数后生成 `bake-{project}.md` |
+| `infra-setup.md` | Goal 3 任务文档 | 基础设施搭建 + Skill 迁移（Stage 6 目录补齐 → Stage 7 Skill 迁移 → Stage 8 完整性检查） |
+| `qa-triage.md` | Goal 4 任务文档 | 全局视角 QA 分诊，将 kb-build-qa 分为 4 档。**种子包完整构建周期的最后一环，默认执行**（无需人类确认） |
 | `prompts/stage-a-subagent.md` | Prompt 模板 | Goal 1 Stage A 工程理解 sub-agent（含排除路径识别） |
 | `prompts/stage-b-subagent.md` | Prompt 模板 | Goal 1 Stage B 文档清单规划 sub-agent（B2 输出含产品视角边界字段） |
 | `prompts/stage-3-subagent.md` | Prompt 模板 | Goal 2 Stage 3 文档生成 sub-agent |
@@ -94,7 +97,7 @@ Goal 3: kb-infra-setup（基础设施 + Skill）
   产出：就绪的 KB 运行环境
   注：原「Commander 内容构建」Stage 已移除（产品视角字段由 Stage B 直接产出）
 
-Goal 4: kb-qa-triage（AFMT-KB-SEED 完整构建周期的最后一环）
+Goal 4: kb-qa-triage（种子包完整构建周期的最后一环）
   输入：Goal 3 完成的 KB + kb-build-qa.md
   过程：备份 kb-build-qa → 批并行分派 sub-agent 用 explore-kb 全局回答 → 重组为 4 档 + 生成 KB patch 建议
   产出：4 档分诊后的 kb-build-qa.md + pass/kb-doc-patches.md（人类批准后 apply）

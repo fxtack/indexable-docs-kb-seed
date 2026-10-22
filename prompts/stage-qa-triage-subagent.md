@@ -52,7 +52,7 @@
 
 **允许**：读 `index.yaml.modules[<id>]` 中的产品视角边界字段（`responsibility` / `capability_boundary` / `communicates_with`）作为辅助判断（v2.0 起已内嵌于 index.yaml，无需读独立文件）。
 
-**不允许**：读源代码（除非 explore-kb 明确指向某源文件且需要交叉核实）；把 `.think-tank/afmt-kb-seed/` 内的种子包内容当作 KB 内容。
+**不允许**：读源代码（除非 explore-kb 明确指向某源文件且需要交叉核实）；把 `.think-tank/indexable-docs-kb-seed/` 内的种子包内容当作 KB 内容。
 
 ### 3. 做出判定
 

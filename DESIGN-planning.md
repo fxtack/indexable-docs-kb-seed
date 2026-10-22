@@ -1,6 +1,6 @@
-# AFMT-KB-SEED 任务规划方案
+# Indexable Docs KB Seed 任务规划方案
 
-> 本文档描述如何**规划**以 `/goal` 驱动的 AFMT-KB-SEED（Architecture/Flows/Modules/Troubleshooting Knowledge Base Seed）任务。
+> 本文档描述如何**规划**以 `/goal` 驱动的知识库种子包（Indexable Docs KB Seed）任务。
 > 它不产出 KB，而是产出一套**可分发到其他工程的、结构化的任务描述文档**，目标工程的 Agent 读取后能自主构建等价的知识库体系。
 >
 > 本文档属于"规划的规划"——回答的问题不是"种子任务怎么执行"，而是"种子任务文档应该怎么设计，要覆盖哪些维度，采用什么结构，以及这套文档如何被 Goal/Agent/Sub-agent 体系驱动执行"。
@@ -15,10 +15,11 @@
 
 ```
 输入：一套已建成的同构知识库（结构 + 规范 + Skill + 行为模式 + 实际构建流程经验），本种子包的示例取自 Redis 8.10.2
-产出：一套 AFMT-KB-SEED 任务文档，包含：
-  - AFMT-KB-SEED-primer.md（Goal 1 任务文档：理解工程 → 产出实例化执行计划）
-  - AFMT-KB-SEED-bake.md.template（Goal 2 任务文档模板：确定性执行 → 产出完整 KB）
-  - AFMT-KB-SEED-infra-setup.md（Goal 3 任务文档：基础设施搭建 + Skill 迁移）
+产出：一套种子包任务文档，包含：
+  - primer.md（Goal 1 任务文档：理解工程 → 产出实例化执行计划）
+  - bake.md.template（Goal 2 任务文档模板：确定性执行 → 产出完整 KB）
+  - infra-setup.md（Goal 3 任务文档：基础设施搭建 + Skill 迁移）
+  - qa-triage.md（Goal 4 任务文档：QA 全局分诊）
   - 配套的模板文件、Prompt 模板、Schema 定义
 ```
 
@@ -97,10 +98,10 @@ Goal 3: kb-infra-setup（基础设施搭建）
 
 ```
 条件：.git 目录存在于当前工作目录
-含义：AFMT-KB-SEED 任务文档预期放置在工程根目录下执行
+含义：任务文档须以工程根目录为工作目录被 `/goal` 驱动（文档内相对路径基于工程根解析）
 行为：不满足时终止执行，输出：
   "当前目录不是 git 仓库根目录（未检测到 .git）。
-   请将 AFMT-KB-SEED 任务文档放置到工程根目录下，然后重新执行。"
+   请先 cd 到含 .git 的工程根目录，再执行 /goal .think-tank/indexable-docs-kb-seed/primer.md"
 ```
 
 **通过后**：主 Agent 可正式进入 Goal 1（kb-primer）。
@@ -124,7 +125,7 @@ Stage B: 文档清单规划
 
 Stage C: 实例化 Goal 2 任务文档
   └── 主 Agent 基于 Stage A+B 的产出，填充 Goal 2 任务文档模板的所有参数
-  └── 产出：一份参数完整的 AFMT-KB-SEED-bake-{project}.md
+  └── 产出：一份参数完整的 bake-{project}.md
 ```
 
 ### 3.3 Stage A: 工程理解 + 元规范推导
@@ -226,7 +227,7 @@ Sub-agent B4（Troubleshooting）：
 ```yaml
 # index.yaml 顶部
 meta:
-  seed_pack_version: "1.0.0"       # 生成本 KB 的 AFMT-KB-SEED 种子包版本
+  seed_pack_version: "1.0.0"       # 生成本 KB 的种子包版本
   seed_pack_build: "YYYY-MM-DD"    # 种子包发布日期
   kb_schema_version: "2.0"         # KB 结构 schema 版本（v2.0 起 modules[] 含产品视角字段）
   built_at: "YYYY-MM-DDTHH:MM:SS+TZ"  # 本次构建时间
@@ -332,7 +333,7 @@ sub-agent 总数：N_total × (1 + R) + ~12
 
 用户在读到这段后可以判断：是否值得启动、何时启动、是否需要先申请更高 API 配额。这也是作为成本基线的参考点。
 
-**输出**：`AFMT-KB-SEED-bake-{project}.md`——一份参数完全的、可确定性执行的任务文档。
+**输出**：`bake-{project}.md`——一份参数完全的、可确定性执行的任务文档。
 
 **Goal 1 完成条件**：
 - 4 份元规范文件存在
@@ -917,7 +918,7 @@ review_max_rounds: 5      # 小型工程为 2
 ```
 每个 Goal 有独立的任务文档，Progress Log 写在自己的任务文档中：
 
-Goal 1 (AFMT-KB-SEED-primer.md):
+Goal 1 (primer.md):
   ## Progress Log
   | 时间 | Stage | 动作 | 结果 |
   |------|-------|------|------|
@@ -925,7 +926,7 @@ Goal 1 (AFMT-KB-SEED-primer.md):
   | T1 | A | A1/A2/A3 返回，分派元规范生成 sub-agent | ⏳ |
   ...
 
-Goal 2 (AFMT-KB-SEED-bake-{project}.md):
+Goal 2 (bake-{project}.md):
   ## Progress Log
   | 时间 | Stage | 动作 | 结果 |
   |------|-------|------|------|
@@ -976,7 +977,7 @@ index.yaml 仅主 Agent 写入（每个 Stage 结束时统一更新）→ 无并
 
 ### 9.1 设计目标
 
-AFMT-KB-SEED 的三个 Goal 可能跨越数小时甚至更久（取决于工程规模）。主 Agent 和 sub-agent 可能因各种原因中断（session 超时、API 限流、人为停止）。整个可观测性体系（Progress Log + Journal）需要同时服务三个目标：
+种子包的三个 Goal 可能跨越数小时甚至更久（取决于工程规模）。主 Agent 和 sub-agent 可能因各种原因中断（session 超时、API 限流、人为停止）。整个可观测性体系（Progress Log + Journal）需要同时服务三个目标：
 
 | 目标 | 读者 | 承载者 | 核心需求 |
 |------|------|--------|---------|
@@ -1014,7 +1015,7 @@ AFMT-KB-SEED 的三个 Goal 可能跨越数小时甚至更久（取决于工程�
 ```
 # Journal: kb-primer
 
-<!-- 权威状态请查阅任务文档 AFMT-KB-SEED-primer.md 的 Progress Log 章节。
+<!-- 权威状态请查阅任务文档 primer.md 的 Progress Log 章节。
      本 Journal 仅追加事件流水，不维护聚合状态。 -->
 
 ## Entries
@@ -1150,7 +1151,7 @@ Journal 条目使用 `action` 字段标记语义类型。主 Agent 在写入 Jou
 整个体系的可重拭性依赖三个要素的配合：
 
 ```
-任务文档 Progress Log（AFMT-KB-SEED-*.md）
+任务文档 Progress Log（`primer.md` / `bake-*.md` / `infra-setup.md` / `qa-triage.md`）
     ↑ 权威状态源：哪个 Stage/Batch 处于什么状态（每 Stage 完成时更新）
 Journal Entries（pass/kb-seed-journal-*.md）
     ↑ 事件流水：每个 sub-agent 的分派、完成、重试、错误（追加式）
@@ -1302,7 +1303,7 @@ v6 起明确职责分离，消除 v5 版本中两者维护重叠的问题：
 
 | | 任务文档 Progress Log | Journal Entries |
 |------|-------------|--------|
-| **位置** | 任务文档末尾（`AFMT-KB-SEED-*.md`） | `pass/kb-seed-journal-*.md` |
+| **位置** | 任务文档末尾 | `pass/kb-seed-journal-*.md` |
 | **角色** | **唯一权威状态源** | 事件流水（详情） |
 | **粒度** | Stage/Batch 级别（"Stage B 完成 ✅"） | Sub-agent 级别（每个 sub-agent 的分派、结果、重试） |
 | **用途** | Goal 条件评估（Haiku 读此判断进度）+ 新 Agent 恢复的第一站 | 事后复盘 + 恢复时的详细上下文 |
@@ -1314,15 +1315,17 @@ v6 起明确职责分离，消除 v5 版本中两者维护重叠的问题：
 
 ## 10. 种子包的内容
 
-AFMT-KB-SEED 作为可分发物，包含以下文件：
+> 以本节与 `README.md` §文件清单为准；两者不一致时以实际目录为准，并回改本节。
+
+种子包作为可分发物，包含以下文件：
 
 | 文件 | 类型 | 说明 |
 |------|------|------|
 | `VERSION` | 版本文件 | 单行文本，内容为种子包版本号（如 `1.0.0`）。Goal 1 Stage B 读取此文件填入 `index.yaml.meta.seed_pack_version` |
 | `CHANGELOG.md` | 版本变更记录 | 记录各版本间的破坏性变更、迁移指南。供后续升级工具对照 |
-| `AFMT-KB-SEED-primer.md` | Goal 1 任务文档模板 | 需要被 `/goal` 驱动执行。文档中有 `{ADAPT}` 标记表示需根据目标工程调整的段落 |
-| `AFMT-KB-SEED-bake.md.template` | Goal 2 任务文档模板 | 不直接执行。由 Goal 1 的 Stage C 填充实例化参数后生成 `-bake-{project}.md`，再被 Goal 2 执行 |
-| `AFMT-KB-SEED-infra-setup.md` | Goal 3 任务文档 | Skill 迁移、基础设施搭建、元文档移植的执行指令。不模板化，直接分发（目标工程 KB 结构已就绪） |
+| `primer.md` | Goal 1 任务文档模板 | 需要被 `/goal` 驱动执行。文档中有 `{ADAPT}` 标记表示需根据目标工程调整的段落 |
+| `bake.md.template` | Goal 2 任务文档模板 | 不直接执行。由 Goal 1 的 Stage C 填充实例化参数后生成 `bake-{project}.md`，再被 Goal 2 执行 |
+| `infra-setup.md` | Goal 3 任务文档 | Skill 迁移、基础设施搭建、元文档移植的执行指令。不模板化，直接分发（目标工程 KB 结构已就绪） |
 | `templates/meta-knowledge-base-guide.md.template` | 元规范模板 | 含 `{ADAPT}` 标记，由 Stage A 的 sub-agent 适配 |
 | `templates/meta-work-guide.md` | 通用模板 | 直接可用（Work 文档规范是通用的） |
 | `templates/meta-runbook-guide.md` | 通用模板 | 直接可用 |
@@ -1338,11 +1341,8 @@ AFMT-KB-SEED 作为可分发物，包含以下文件：
 | `skills/explore-kb/` | Skill | 已去耦合，直接复制。Goal 3 Stage 7 中迁移 |
 | `skills/maintain-kb/` | Skill | 已去耦合，直接复制。Goal 3 Stage 7 中迁移 |
 | `skills/commander/` | Skill（模板化） | v1.1 新增。含 SKILL.md + 5 references。文件中使用 `{{PROJECT_NAME}}` / `{{PROJECT_SLUG}}` / `{{MODULE_LIST_INLINE}}` 等占位符。Goal 3 Stage 7 迁移时边复制边替换占位符（`{ADAPT}` 标记保留） |
-| `templates/commander/module_header_meta.md` | 通用规范 | v1.1 新增。module_header 字段规范与构建指令。Goal 3 Stage 8 中复制到 `.think-tank/commander/` |
-| `templates/commander/README.md.template` | 元文档模板 | v1.1 新增。含 `{ADAPT}` 标记。Goal 3 Stage 8.3 由 sub-agent 填充生成实际 README |
-| `templates/commander/history/decisions/TEMPLATE.md` | 通用模板 | v1.1 新增。历史决策记录模板 + 目录规范，直接可用 |
-| `templates/commander/history/decisions/index.yaml.template` | 索引模板 | v1.1 新增。含 `{{PROJECT_NAME}}` / `{{TODAY}}` 占位符。Goal 3 Stage 8.1 中替换后写入 |
-| `prompts/stage-commander-header-gen.md` | Prompt 模板 | v1.1 新增。Goal 3 Stage 8.2 从 `knowledge-base/modules/<id>.md` 上浮生成 `commander/module_header_<Name>.md` 的 sub-agent prompt，内嵌上浮转换规则 |
+| `qa-triage.md` | Goal 4 任务文档 | 全局 QA 分诊：把 `kb-build-qa.md` 重组为 4 档 verdict + 产出 `kb-doc-patches.md`。默认执行 |
+| `templates/kb-readme.md.template` | 元文档模板 | 含 `{ADAPT}` 标记。Goal 3 Stage 6 用于生成 KB 根 `README.md` |
 | `knowledge-extract-qa-guide.md` | 关键元文档 | 通用文档，定义 QA 提取工作流（内嵌格式规范，替代 qa-template.md）。Goal 3 中迁移 |
 
 ---

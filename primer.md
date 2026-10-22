@@ -1,4 +1,4 @@
-# AFMT-KB-SEED · Goal 1: kb-primer
+# Indexable Docs KB Seed · Goal 1: kb-primer
 
 > **执行方式**：本文档由 `/goal` 驱动执行。主 Agent 逐 Stage 推进，分派 sub-agent 完成具体任务。
 > **禁止**：主 Agent 亲自读源码分析。所有源码分析工作必须通过 sub-agent 完成。
@@ -11,9 +11,9 @@
 
 **goal_id**: `kb-primer`
 **goal_name**: 知识库构建的分析与规划阶段
-**seed_pack_version**: `<从 .think-tank/afmt-kb-seed/VERSION 读取>`
+**seed_pack_version**: `<从 .think-tank/indexable-docs-kb-seed/VERSION 读取>`
 
-**核心产出**：一份参数完全实例化的 Goal 2 任务文档 `AFMT-KB-SEED-bake-{project}.md`，包含所有 sub-agent 分派参数，可被 `/goal` 直接执行。
+**核心产出**：一份参数完全实例化的 Goal 2 任务文档 `bake-{project}.md`，包含所有 sub-agent 分派参数，可被 `/goal` 直接执行。
 
 ---
 
@@ -30,7 +30,7 @@
 3. `.think-tank/knowledge-base/index.yaml` 完整（含所有 A/F/M/T 条目 + `meta.seed_pack_version` 等版本契约字段）
 4. `.think-tank/knowledge-base/.meta-maintain-beacon.yaml` 已创建（commit = HEAD）
 5. `.think-tank/knowledge-base/.meta-explore-issues.jsonl` 已创建（空文件）
-6. `AFMT-KB-SEED-bake-{project}.md` 已生成，包含：
+6. `bake-{project}.md` 已生成，包含：
    - 所有确定性参数（文档清单、分批策略、并发数、Review 轮次、收敛标准）
    - 头部含"预计成本"章节（sub-agent 数、token 估算、耗时估算）
 7. 本文档的 Progress Log 中，Stage A/B/C 三行状态均为 ✅
@@ -43,9 +43,9 @@ GOAL_MET: kb-primer 完成。
   文档：架构 {K} 份 / 模块 {N} 份 / 流程 {M} 份 / 故障 {T} 项
   已排除路径：{E} 项（vendor / 第三方 / 生成产物 / submodule，详见 index.yaml.meta.excluded_paths）
   预计 Goal 2：{X} 个 sub-agent / {Y} 小时
-  Goal 2 任务文档：AFMT-KB-SEED-bake-{project}.md 已就绪
+  Goal 2 任务文档：bake-{project}.md 已就绪
 
-  AFMT-KB-SEED 完整构建周期为 Goal 1 → Goal 2 → Goal 3 → Goal 4。当前 Goal 1 完成，请人类 review 文档清单和预计成本，确认后启动 Goal 2；后续 Goal 2 → 3 → 4 会连续推进（除非人类显式跳过 Goal 4）。
+  种子包完整构建周期为 Goal 1 → Goal 2 → Goal 3 → Goal 4。当前 Goal 1 完成，请人类 review 文档清单和预计成本，确认后启动 Goal 2；后续 Goal 2 → 3 → 4 会连续推进（除非人类显式跳过 Goal 4）。
 ```
 
 ---
@@ -81,21 +81,21 @@ GOAL_MET: kb-primer 完成。
 
 ```
 条件：.git 目录存在于当前工作目录
-含义：AFMT-KB-SEED 任务文档预期放置在工程根目录下执行
+含义：任务文档须以工程根目录为工作目录被 `/goal` 驱动（文档内相对路径基于工程根解析）
 行为：不满足时终止执行，输出：
   "当前目录不是 git 仓库根目录（未检测到 .git）。
-   请将 AFMT-KB-SEED 任务文档放置到工程根目录下，然后重新执行。"
+   请先 cd 到含 .git 的工程根目录，再执行 /goal .think-tank/indexable-docs-kb-seed/primer.md"
 ```
 
 ### 检查 3：种子包完整性
 
 ```
 条件：以下路径全部存在
-  .think-tank/afmt-kb-seed/VERSION
-  .think-tank/afmt-kb-seed/prompts/stage-a-subagent.md
-  .think-tank/afmt-kb-seed/prompts/stage-b-subagent.md
-  .think-tank/afmt-kb-seed/schemas/stage-b-output.schema.json
-  .think-tank/afmt-kb-seed/templates/meta-knowledge-base-guide.md.template
+  .think-tank/indexable-docs-kb-seed/VERSION
+  .think-tank/indexable-docs-kb-seed/prompts/stage-a-subagent.md
+  .think-tank/indexable-docs-kb-seed/prompts/stage-b-subagent.md
+  .think-tank/indexable-docs-kb-seed/schemas/stage-b-output.schema.json
+  .think-tank/indexable-docs-kb-seed/templates/meta-knowledge-base-guide.md.template
 行为：任一缺失即终止，输出：
   "种子包不完整。缺失文件：{list}。请重新完整复制种子包。"
 ```
@@ -112,7 +112,7 @@ GOAL_MET: kb-primer 完成。
 
 ### A.1 分派工程理解 sub-agents（并行 3 个）
 
-分派三个 sub-agent，prompt 模板来自 `.think-tank/afmt-kb-seed/prompts/stage-a-subagent.md`，通过参数区分维度：
+分派三个 sub-agent，prompt 模板来自 `.think-tank/indexable-docs-kb-seed/prompts/stage-a-subagent.md`，通过参数区分维度：
 
 | Sub-agent | 维度 | 关键输入 | 产出 |
 |-----------|------|---------|------|
@@ -246,7 +246,7 @@ Prompt 模板来自 `prompts/stage-b-subagent.md`，通过 `dimension` 参数区
 
 ```yaml
 meta:
-  seed_pack_version: "<读自 .think-tank/afmt-kb-seed/VERSION>"
+  seed_pack_version: "<读自 .think-tank/indexable-docs-kb-seed/VERSION>"
   seed_pack_build: "<种子包发布日期，从 CHANGELOG.md 首个版本节读取>"
   kb_schema_version: "1.0"
   built_at: "<当前 ISO 8601 时间戳>"
@@ -386,15 +386,15 @@ token_output_est = N_total × (1 + R) × 10K
 
 ### C.4 填充 Goal 2 任务文档模板
 
-主 Agent 读取 `templates/AFMT-KB-SEED-bake.md.template`（或 `.think-tank/afmt-kb-seed/AFMT-KB-SEED-bake.md.template`），逐一替换所有 `{{PLACEHOLDER}}`，生成：
+主 Agent 读取 `bake.md.template`（位于种子包根，即 `.think-tank/indexable-docs-kb-seed/bake.md.template`），逐一替换所有 `{{PLACEHOLDER}}`，生成：
 
-**输出路径**：`.think-tank/afmt-kb-seed/AFMT-KB-SEED-bake-{project_name}.md`
+**输出路径**：`.think-tank/indexable-docs-kb-seed/bake-{project_name}.md`
 
 （放在种子包目录下的原因：Goal 2 是"种子包的实例化产物"，与 primer/infra-setup 同级便于人类查看和 review）
 
 ### C.5 Stage C 收尾
 
-- 验证 `AFMT-KB-SEED-bake-{project_name}.md` 存在且所有 `{{PLACEHOLDER}}` 已替换（grep `{{` 应无匹配）
+- 验证 `bake-{project_name}.md` 存在且所有 `{{PLACEHOLDER}}` 已替换（grep `{{` 应无匹配）
 - 更新本文档 Progress Log：`Stage C: ✅`
 - Journal 追加 `action: goal_completed`
 
