@@ -19,7 +19,7 @@
   - `AFMT-KB-SEED-infra-setup.md` → `infra-setup.md`
   - `AFMT-KB-SEED-qa-triage.md` → `qa-triage.md`
 - **schema `$id`**：`urn:afmt-kb-seed:schema:*` → `urn:indexable-docs-kb:schema:*`
-- **概念表述**：`AFMT` 保留为"**默认四维**"的简称，并明确其为默认组织方式、可在 Goal 1 Stage B 规划阶段增删维度。
+- **概念表述**：`AFMT` 保留为"**默认四维**"的简称。明确「维度集合可演进」指的是**种子包层的演进**（新增维度 = 更新任务/模板/schema/Stage），而非运行时自定义；并区分两类知识来源——从源码推导（AFMT 四维）与构建后收纳（`works/` 一类，未来的会议纪要等维度属此类）。
 
 ### 兼容性
 - **对已构建的 KB**：内容与结构不受影响；但种子包目录名与任务文档文件名变化，**旧路径将失效**。
