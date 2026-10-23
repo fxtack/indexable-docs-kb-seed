@@ -121,6 +121,35 @@
 
 如果你为 frontmatter 补充了新的 keywords 或调整了 description，同步更新 `.think-tank/knowledge-base/index.yaml` 中对应条目。
 
+### 6. 发现目标工程代码/流程问题（只记录）
+
+如果你在阅读代码时发现**代码本身可能有问题**——例如行为与注释/断言矛盾、明显的边界遗漏、配置与实际行为不符——不要在构建期确认、修复或阻塞，也不要写进 QA jsonl。
+
+在返回值里增加 `discovered_issues` 数组，每项包含：
+
+```json
+{
+  "summary": "一句话说明发现，含关键符号名",
+  "subject": "target-project | seed",
+  "kind": "code-defect | process-defect | tooling-defect | config-defect | unknown",
+  "confidence": "suspected | evidence-backed",
+  "evidence": "符号/文件/观察到的行为；禁止行号",
+  "impact": "可能影响；不确定时写影响未知",
+  "suggested_verification": "人类或构建后复核任务可执行的核实方式；构建期不执行",
+  "related_kb_doc": "当前文档路径",
+  "affected_version": "commit/tag（若已知）"
+}
+```
+
+判定边界：
+
+- **文档与代码不一致**：修文档（这属于 KB 构建），不记 `discovered_issues`；
+- **代码行为本身可能不符合预期**：只记录，不改代码、不跑测试确认；
+- **只是设计意图缺失**（为什么是这个值/这个流程）：写 QA jsonl，走 `knowledge_gap`，不要记成代码 bug；
+- **单份文档建议不超过 5 条**；更多时合并同类，不要把猜测凑成列表。
+
+主 Agent 会为这些条目分配 `DISC-xxxx` 并写入 `.think-tank/knowledge-base/pass/build-findings/discovered-issues.jsonl`。你不需要自己写这个文件。
+
 ---
 
 ## 输出
@@ -136,6 +165,7 @@
   "sections_filled": ["职责", "数据模型", "关键 API", "业务流程", "设计决策", "已知陷阱", "变更影响"],
   "word_count_approx": 3500,
   "qa_entries_added": 3,
+  "discovered_issues": [],
   "index_yaml_updated": true,
   "notes": "..."
 }
@@ -146,6 +176,7 @@
 ## 硬约束
 
 - **禁止**：分派新的 sub-agent；跨越 `COVERS_CODE` 之外做全局分析；引用行号；在 QA jsonl 里问不需要人类回答的问题（如"这个函数是干嘛的"——你自己应该读代码回答）
+- **禁止**：把代码/流程疑似 bug 写进 QA jsonl；修改目标工程源码/配置/测试；为了确认问题运行构建、测试或复现命令；在构建期要求人类决策
 - **允许**：为理解上下文而读 `COVERS_CODE` 之外的文件；提问工程决策层面的问题（"这个设计是为了兼容旧版本吗？"）
 - **必须**：以源代码为唯一事实来源；符号名锚定；填充所有必填章节（若确实无内容，写"待补充"并写 QA 条目）
 

@@ -105,6 +105,35 @@
 - `content` 用 Markdown 格式，符号名锚定代码，**不含技术术语的过度膨胀**（就是把 ai_answer 转成 KB 语气）
 - **不允许**私自修改 KB 文档——你只**建议**，主 Agent 会把 patches 汇总到 `.think-tank/knowledge-base/pass/kb-doc-patches.md`，人类批准后由 `/maintain-kb --apply-patches` 落地
 
+### 4.1 发现目标工程代码/流程问题（只记录）
+
+分诊过程中如果发现**代码本身可能有问题**——行为与注释/断言矛盾、明显边界遗漏、配置与实际行为不符——不要在 Goal 4 确认、修复或阻塞，也不要写进 `suggested_kb_patch`。
+
+在返回值里增加 `discovered_issues` 数组，每项包含：
+
+```json
+{
+  "summary": "一句话说明发现，含关键符号名",
+  "subject": "target-project | seed",
+  "kind": "code-defect | process-defect | tooling-defect | config-defect | unknown",
+  "confidence": "suspected | evidence-backed",
+  "evidence": "符号/文件/观察到的行为；禁止行号",
+  "impact": "可能影响；不确定时写影响未知",
+  "suggested_verification": "构建后复核任务可执行的核实方式；构建期不执行",
+  "related_kb_doc": "QA_LOCATION 中的文档路径",
+  "affected_version": "commit/tag（若已知）"
+}
+```
+
+判定边界：
+
+- **文档与代码不一致**：这属于 KB 内容问题，走分诊/patch，不记 `discovered_issues`；
+- **代码行为本身可能不符合预期**：只记录，不扩大调查；
+- **只是设计意图缺失**：留在 QA 的 `kb_gaps`，不要记成代码 bug；
+- **单条 QA 建议不超过 3 条**；更多时合并同类。
+
+主 Agent 会为这些条目分配 `DISC-xxxx` 并写入 `.think-tank/knowledge-base/pass/build-findings/discovered-issues.jsonl`。你不需要自己写这个文件。
+
 ### 5. 交叉验证（内部自检）
 
 写入返回值前，自问：
@@ -117,7 +146,7 @@
 
 ## 输出
 
-严格按 `schemas/qa-triage-output.schema.json` 返回单个 JSON 对象。**不要**加前后缀文字，**不要**用 ```json ``` 包裹（返回值即工具输出本体）。
+严格按 `schemas/qa-triage-output.schema.json` 返回单个 JSON 对象。**不要**加前后缀文字，**不要**用 ```json ``` 包裹（返回值即工具输出本体）。`discovered_issues` 是可选数组；没有发现时返回空数组。
 
 **示例（fully_answered）**：
 
@@ -133,6 +162,7 @@
     {"path": ".think-tank/knowledge-base/modules/rdb-persistence.md", "section": "§4.1 bgsave 执行流程"}
   ],
   "suggested_kb_patch": null,
+  "discovered_issues": [],
   "explore_kb_invocations": 2,
   "notes": ""
 }

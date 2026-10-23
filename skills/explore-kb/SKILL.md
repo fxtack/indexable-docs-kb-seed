@@ -25,7 +25,7 @@ user-invocable: true
 | `troubleshooting/` | 高频问题排查 | 遇到异常现象需要定位 |
 | `develop/` | 研发行为规范 | 特定操作（如驱动开发、错误处理）有规范约束时 |
 | `works/` | 研发任务中枢 | 接到研发任务需创建设计文档、查阅既有决策 |
-| `pass/` | 上游输入临时中转 | 只读参考，**不入 index.yaml**，消化后转化为 works/ 或代码 |
+| `pass/` | 构建期产物 + 外部输入中转 | 只读参考，**不入 index.yaml**；构建 QA / Journal / build-findings 与外部输入都放这里，消化后转化为 works/ 或代码 |
 
 检索入口只有一个：**`.think-tank/knowledge-base/index.yaml`**。始终从这里开始。
 
@@ -91,7 +91,7 @@ Bug / 异常报告
 
 - **kb 是辅助，代码是唯一事实来源**。1-2 个文件的局部细节应直接读代码。发现文档与代码不一致时以代码为准，并提示用户 kb 需更新。
 - **不重复代码内容**：模块文档记录设计决策、业务流程、已知陷阱——这些是代码里读不出来的东西。引用代码位置即可，不逐行复述。
-- **pass/ 是上游输入源**：只读临时中转，不入 index.yaml。消化后转化为 works/ 或代码。
+- **pass/ 是构建期产物与外部输入的中转区**：只读参考，不入 index.yaml；构建 QA / Journal / build-findings 与外部输入都放这里。消化后转化为 works/ 或代码；`build-findings` 中未确认的条目不要当作 KB 知识使用。
 - **与 CLAUDE.md 的关系**：CLAUDE.md 声明了 kb 基础使用行为（场景→目录映射、两层配合）。本 skill 提供深度操作（三级检索、规划流程、排查流程），不重复 CLAUDE.md 已声明的内容。
 - **发现 KB 与代码不一致时**：(1) 立即以代码为事实源响应当前任务（零延迟）；(2) 静默追加一行 JSONL 到 `.think-tank/knowledge-base/.meta-explore-issues.jsonl`，格式：`{"kb_entry":"<entry-id>","section":"<§>","note":"<差异简述>","timestamp":"<ISO8601>"}`；(3) 建议用户后续调用 `/maintain-kb` 进行系统性修复。
 - **kb 一致性维护**：调用 `/maintain-kb` skill 可进行增量/全量两种模式的 KB 与代码一致性检查与修复。本 skill 负责检索与发现问题，maintain-kb 负责系统性诊断与修复。

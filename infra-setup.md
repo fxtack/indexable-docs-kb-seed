@@ -38,11 +38,14 @@
 - `.claude` 兼容层：`.claude` 或 `.claude/skills` 指向 `.agents`（Claude Code 读取同一份 skill；不维护第二份副本）
 
 **目录**：
-- `pass/` / `works/` / `develop/` / `troubleshooting/incidents/`
+- `pass/` / `pass/build-findings/` / `works/` / `develop/` / `troubleshooting/incidents/`
 
 **收尾产物**：
 - `pass/kb-seed-postmortem.md`
 - `pass/kb-seed-summary.md`
+- `pass/build-findings/discovered-issues.jsonl`（Goal 2 产出，可为空文件）
+- `pass/build-findings/kb-build-discovered-issues.md`（Goal 3 生成快照，Goal 4 收官时刷新）
+- `pass/build-findings/verify-build-findings.md`（构建后复核任务文档）
 
 达成后主 Agent 输出：
 
@@ -52,6 +55,7 @@ GOAL_MET: kb-infra-setup 完成。
   产品视角边界字段：<N> 个模块（Goal 2 Stage B 已产出并写入 index.yaml.modules[]）
   Postmortem: pass/kb-seed-postmortem.md
   Summary: pass/kb-seed-summary.md
+  Build findings: pass/build-findings/kb-build-discovered-issues.md（未确认；复核入口 pass/build-findings/verify-build-findings.md）
   KB 基础设施已就绪，但种子包**完整构建周期尚未收官**。
 
   **下一步：启动 Goal 4 (kb-qa-triage) 完成 QA 全局分诊**
@@ -70,6 +74,8 @@ GOAL_MET: kb-infra-setup 完成。
 - 验证 `.think-tank/knowledge-base/index.yaml` 存在（Goal 1 产出）
 - 验证 `index.yaml.modules[]` 中至少 1 项含 `responsibility` 字段（Goal 1 Stage B 应已产出产品视角字段）
 - 验证 `.think-tank/knowledge-base/pass/kb-build-qa.md` 存在（Goal 2 产出）
+- 验证 `.think-tank/knowledge-base/pass/build-findings/discovered-issues.jsonl` 存在；若缺失（旧构建或 Goal 2 遗漏），创建空文件并 Journal 记录 `{action: decision, decision: build_findings_missing}`
+- 验证 `.think-tank/indexable-docs-kb-seed/verify-build-findings.md` 存在（构建后复核任务文档；Goal 3 会复制到 `pass/build-findings/`）
 - 验证 `.think-tank/indexable-docs-kb-seed/skills/` 目录存在（种子包应含 explore-kb / maintain-kb / commander 三个 skill）
 - 验证 `.think-tank/indexable-docs-kb-seed/skills/commander/SKILL.md` 存在（种子包应含 Commander skill 模板。若缺失，说明种子包不完整，应重新复制种子包）
 - 读取 `.think-tank/indexable-docs-kb-seed/VERSION` 获得 `seed_pack_version`
@@ -88,6 +94,7 @@ GOAL_MET: kb-infra-setup 完成。
 
 ```
 mkdir -p .think-tank/knowledge-base/pass
+mkdir -p .think-tank/knowledge-base/pass/build-findings
 mkdir -p .think-tank/knowledge-base/works
 mkdir -p .think-tank/knowledge-base/develop
 mkdir -p .think-tank/knowledge-base/troubleshooting/incidents
@@ -318,6 +325,7 @@ test -f .claude/skills/{{PROJECT_SLUG}}-commander/SKILL.md
 [ ] .think-tank/knowledge-base/works/.meta-work-guide.md
 [ ] .think-tank/knowledge-base/troubleshooting/runbooks/.meta-runbook-guide.md
 [ ] .think-tank/knowledge-base/troubleshooting/incidents/.meta-incident-guide.md
+[ ] .think-tank/knowledge-base/pass/build-findings/discovered-issues.jsonl
 [ ] .agents/skills/explore-kb/SKILL.md
 [ ] .agents/skills/maintain-kb/SKILL.md
 [ ] .agents/skills/{{PROJECT_SLUG}}-commander/SKILL.md（必装）
@@ -333,6 +341,7 @@ test -f .claude/skills/{{PROJECT_SLUG}}-commander/SKILL.md
 [ ] .think-tank/knowledge-base/develop/
 [ ] .think-tank/knowledge-base/troubleshooting/incidents/
 [ ] .think-tank/knowledge-base/troubleshooting/runbooks/
+[ ] .think-tank/knowledge-base/pass/build-findings/
 [ ] .think-tank/knowledge-base/architecture/
 [ ] .think-tank/knowledge-base/modules/
 [ ] .think-tank/knowledge-base/flows/
@@ -358,6 +367,7 @@ test -f .claude/skills/{{PROJECT_SLUG}}-commander/SKILL.md
 - .think-tank/knowledge-base/pass/kb-seed-journal-kb-docs-bake.md
 - .think-tank/knowledge-base/pass/kb-seed-journal-kb-infra-setup.md
 - .think-tank/knowledge-base/pass/kb-build-qa.md（若存在）
+- .think-tank/knowledge-base/pass/build-findings/discovered-issues.jsonl（若存在）
 - .think-tank/knowledge-base/index.yaml（用于统计产品视角字段覆盖率）
 
 输出：.think-tank/knowledge-base/pass/kb-seed-postmortem.md
@@ -383,9 +393,64 @@ test -f .claude/skills/{{PROJECT_SLUG}}-commander/SKILL.md
 
 ## 5. 流程优化建议
   - 基于本次构建观察，给种子包维护者的改进建议
+
+## 6. 构建期发现摘要（未确认）
+  - 只统计 pass/build-findings/discovered-issues.jsonl 的 subject / kind / confidence 分布，不展开未确认结论
+  - 目标工程问题汇总到 pass/build-findings/kb-build-discovered-issues.md，由构建后复核任务处理
+  - seed/process 类问题可在此展开，供种子包维护者改进
 ```
 
-### 8.3 生成 summary（主 Agent 直接执行）
+### 8.3 生成构建期发现快照与复核任务（主 Agent 直接执行）
+
+**输入**：
+- `.think-tank/knowledge-base/pass/build-findings/discovered-issues.jsonl`
+- `.think-tank/indexable-docs-kb-seed/verify-build-findings.md`
+
+**输出**：
+- `.think-tank/knowledge-base/pass/build-findings/kb-build-discovered-issues.md`
+- `.think-tank/knowledge-base/pass/build-findings/verify-build-findings.md`（从种子包复制）
+
+**快照结构**：
+
+```markdown
+# {{PROJECT_NAME}} 构建过程中发现的问题记录
+
+> 本文件只记录，不代表已确认或已修复。构建期间未修改目标工程源码/配置，也未运行验证命令。
+
+Generated at: <ISO 8601>
+Seed pack version: {{SEED_PACK_VERSION}}
+
+## 摘要
+- 目标工程代码/流程：{N_target} 项
+- 种子包/构建流程：{N_seed} 项
+- 按置信度：suspected {N_s} / evidence-backed {N_e}
+
+## 目标工程代码/流程问题
+### [DISC-0001] {summary}
+- 发现位置：{goal} / Stage {stage} / Round {round} / {doc_id}
+- 类型：{kind}
+- 置信度：{confidence}
+- 证据：{evidence}
+- 可能影响：{impact}
+- 建议核实方式：{suggested_verification}
+- 相关 KB 文档：{related_kb_doc}
+- 状态：{status}
+
+## 种子包/构建流程问题
+（同上结构；无条目时写“无”）
+
+## 处理建议
+- 构建期未确认、未修复；请先运行 `pass/build-findings/verify-build-findings.md` 做独立复核。
+- 复核确认后再提升到 `troubleshooting/known-bugs.md` 或 `works/`。
+```
+
+**规则**：
+- JSONL 为空时也要生成文件，写“本构建未记录到构建期发现”；
+- 不修改 JSONL 中的 `status`，构建期只应出现 `recorded`；
+- 复制复核任务文档到 `pass/build-findings/verify-build-findings.md`，确保种子包目录被删除后仍可执行；
+- 若种子包源文件缺失，记录到 postmortem，不要伪造任务文档。
+
+### 8.4 生成 summary（主 Agent 直接执行）
 
 主 Agent 生成 `.think-tank/knowledge-base/pass/kb-seed-summary.md`：
 
@@ -415,6 +480,14 @@ test -f .claude/skills/{{PROJECT_SLUG}}-commander/SKILL.md
 - Medium: open={O_m} / resolved={R_m}
 - Minor: open={O_min} / resolved={R_min}
 
+## 构建期发现（未确认）
+- 目标工程代码/流程：{N_target} 项
+- 种子包/构建流程：{N_seed} 项
+- 记录：`pass/build-findings/kb-build-discovered-issues.md`
+- 复核入口：`pass/build-findings/verify-build-findings.md`
+
+> 构建期只记录，未确认、未修复；复核确认后才提升到 `troubleshooting/known-bugs.md` 或 `works/`。
+
 ## 下一步行动
 
 **种子包完整构建周期是 Goal 1 → Goal 2 → Goal 3 → Goal 4，本 Goal 完成后应默认继续 Goal 4**：
@@ -427,6 +500,7 @@ test -f .claude/skills/{{PROJECT_SLUG}}-commander/SKILL.md
 4. （可选）阅读 knowledge-extract-qa-guide.md，启动 post-build QA 补充隐性知识
 5. 若 index.yaml.modules[] 有模块缺 responsibility 字段，可运行 /maintain-kb 上浮补齐
 6. 后续代码变更时使用 /maintain-kb 增量维护 KB 一致性
+7. 构建期发现（若有）：运行 `/goal .think-tank/knowledge-base/pass/build-findings/verify-build-findings.md` 做独立复核；确认后再提升到 `troubleshooting/` 或 `works/`
 
 **跳过 Goal 4 的场景**（罕见，仅在下列情况允许）：
 - 人类显式要求跳过
@@ -435,12 +509,21 @@ test -f .claude/skills/{{PROJECT_SLUG}}-commander/SKILL.md
 详见 `qa-triage.md §与人类回答阶段的关系`。
 ```
 
-### 8.4 Stage 8 收尾
+### 8.5 Stage 8 收尾
 
 - 验证 postmortem 和 summary 存在
+- 验证 `pass/build-findings/discovered-issues.jsonl`、`kb-build-discovered-issues.md`、`verify-build-findings.md` 存在
 - 更新 Progress Log：`Stage 8: ✅`
 - Journal 追加 `action: goal_completed`
 - **输出 GOAL_MET 后立即启动 Goal 4**（除非满足 §Goal 条件中列出的降级出口）——主 Agent 不应在此处停顿等待人类确认。Goal 3 与 Goal 4 之间没有需要人类 review 的产物，无需询问
+- **构建期发现提示只在构建收官时出现**：Goal 3 正常完成时只生成快照和复核任务，不主动提示人类处理；若人类已明确跳过 Goal 4 **且 N > 0**，则在 GOAL_MET 末尾追加：
+
+```text
+构建过程中发现潜在或明确问题 {N} 项（目标工程 {X} 项 / 构建流程 {Y} 项）。
+构建期间未做修复或确认。可查看：
+  .think-tank/knowledge-base/pass/build-findings/kb-build-discovered-issues.md
+复核入口：.think-tank/knowledge-base/pass/build-findings/verify-build-findings.md
+```
 
 ---
 

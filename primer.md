@@ -30,10 +30,11 @@
 3. `.think-tank/knowledge-base/index.yaml` 完整（含所有 A/F/M/T 条目 + `meta.seed_pack_version` 等版本契约字段）
 4. `.think-tank/knowledge-base/.meta-maintain-beacon.yaml` 已创建（commit = HEAD）
 5. `.think-tank/knowledge-base/.meta-explore-issues.jsonl` 已创建（空文件）
-6. `bake-{project}.md` 已生成，包含：
+6. `.think-tank/knowledge-base/pass/build-findings/discovered-issues.jsonl` 已创建（可为空文件）
+7. `bake-{project}.md` 已生成，包含：
    - 所有确定性参数（文档清单、分批策略、并发数、Review 轮次、收敛标准）
    - 头部含"预计成本"章节（sub-agent 数、token 估算、耗时估算）
-7. 本文档的 Progress Log 中，Stage A/B/C 三行状态均为 ✅
+8. 本文档的 Progress Log 中，Stage A/B/C 三行状态均为 ✅
 
 达成后主 Agent 输出：
 
@@ -95,7 +96,9 @@ GOAL_MET: kb-primer 完成。
   .think-tank/indexable-docs-kb-seed/prompts/stage-a-subagent.md
   .think-tank/indexable-docs-kb-seed/prompts/stage-b-subagent.md
   .think-tank/indexable-docs-kb-seed/schemas/stage-b-output.schema.json
+  .think-tank/indexable-docs-kb-seed/schemas/discovered-issue.schema.json
   .think-tank/indexable-docs-kb-seed/templates/meta-knowledge-base-guide.md.template
+  .think-tank/indexable-docs-kb-seed/verify-build-findings.md
 行为：任一缺失即终止，输出：
   "种子包不完整。缺失文件：{list}。请重新完整复制种子包。"
 ```
@@ -130,6 +133,7 @@ GOAL_MET: kb-primer 完成。
 2. **取最大值**（保守优先，不用中位数）——理由：低估规模会导致 Stage 3 分批不足、Review 轮次不够、并发过高，纠错成本远高于高估
 3. 判定结果写入 Journal `action: stage_completed` 条目的 `final_scale` 字段
 4. **收集 A1 的 `excluded_paths`**：汇总到主 Agent 的会话记忆中，后续 Stage B/C 都会使用；规模判定时**仅统计非排除路径下的源文件**
+5. **构建期问题记录**：确保 `.think-tank/knowledge-base/pass/build-findings/` 与空 `discovered-issues.jsonl` 存在，收集 A1/A2/A3 输出顶层的 `discovered_issues`，分配 `DISC-xxxx`，追加到该文件；只记录，不确认、不修复、不阻塞
 
 **规模判定表**（任一维度触发即认定该级别）：
 
@@ -192,7 +196,11 @@ GOAL_MET: kb-primer 完成。
 ├── works/                   # 已含 .meta-work-guide.md
 ├── develop/                 # 空目录
 └── pass/                    # 空目录
+    └── build-findings/      # 构建期问题账本（Goal 2/3/4 继续写）
+        └── discovered-issues.jsonl  # 空文件
 ```
+
+创建 `pass/build-findings/` 与空 `discovered-issues.jsonl`；字段规范见 `schemas/discovered-issue.schema.json`。Goal 1 只记录，不确认、不修复。
 
 ### A.5 Stage A 收尾
 
@@ -237,6 +245,7 @@ Prompt 模板来自 `prompts/stage-b-subagent.md`，通过 `dimension` 参数区
      3. 单批全量：若目录也无清晰边界，降级为单批全量分派（仅 small 工程；中/大工程走到此步需人类介入）
    - 环处理决策必须写入 Journal：`action: decision, decision: cycle_broken, cycle: [A→B→A], resolution: {strategy}, node_cleared: {node}`
 4. **excluded_paths 交叉验证**：扫描所有 sub-agent 产出的 `covers_code`，若发现任何路径落在 `EXCLUDED_PATHS` 下（Stage B sub-agent 违反约束的情况），记入 Journal `{action: error, error_type: covers_code_hits_excluded, path: <...>, module: <id>}`，主 Agent 直接从对应模块的 covers_code 中剔除该路径，若剔除后该模块的 covers_code 为空则整模块从清单剔除
+5. **构建期问题记录**：收集 4 份输出顶层的 `discovered_issues`，分配 `DISC-xxxx`，追加到 `.think-tank/knowledge-base/pass/build-findings/discovered-issues.jsonl`；只记录，不确认、不修复、不阻塞
 
 ### B.3 生成 index.yaml + beacon + explore-issues
 

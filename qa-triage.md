@@ -27,7 +27,8 @@
 2. `pass/kb-build-qa.md` 已重组为 4 档结构（含 fully_answered / partially_answered / cannot_answer_needs_human / should_not_be_a_question 分组）
 3. `pass/kb-doc-patches.md` 已生成（含所有 sub-agent 产出的 KB 修改建议，若无建议则为空文件带说明头）
 4. 所有 kb-build-qa 中的 QA 条目均已被 sub-agent 分诊（含 abandoned 项——重试上限失败的问题也需明确标注）
-5. 本文档 Progress Log 中所有 Stage 状态为 ✅
+5. `pass/build-findings/kb-build-discovered-issues.md` 已刷新，`pass/build-findings/verify-build-findings.md` 已就位
+6. 本文档 Progress Log 中所有 Stage 状态为 ✅
 
 达成后主 Agent 输出：
 
@@ -46,6 +47,12 @@ GOAL_MET: kb-qa-triage 完成。种子包完整构建周期 (Goal 1-4) 已收官
   1. review pass/kb-doc-patches.md 决定是否 apply（或运行 /maintain-kb --apply-patches）
   2. 回答 partially_answered + cannot_answer_needs_human 项，Agent 根据回答更新对应 KB 文档
   3. （可选）阅读 knowledge-base/knowledge-extract-qa-guide.md，启动 post-build QA 补充隐性知识
+
+  （仅当构建期发现 N > 0 时输出以下块）
+  构建过程中发现潜在或明确问题 {N} 项（目标工程 {X} 项 / 构建流程 {Y} 项）。
+  构建期间未做修复或确认。可查看：
+    .think-tank/knowledge-base/pass/build-findings/kb-build-discovered-issues.md
+  复核入口：.think-tank/knowledge-base/pass/build-findings/verify-build-findings.md
 ```
 
 ---
@@ -65,6 +72,11 @@ GOAL_MET: kb-qa-triage 完成。种子包完整构建周期 (Goal 1-4) 已收官
 GOAL_ABANDONED: {原因}
   Goal 4 未完成。可基于 pass/kb-build-qa-pre-goal4.md 直接进入人工回答阶段（该文件是 Stage 10.1 的原始 kb-build-qa.md 备份，若 Stage 10.1 未执行则直接用 pass/kb-build-qa.md）。
   若因资源不足暂时降级，可在后续任意时刻重新 /goal .think-tank/indexable-docs-kb-seed/qa-triage.md 重启 Goal 4。
+
+  （仅当构建期发现 N > 0 时输出以下块）
+  构建期发现（未确认）：
+    查看：.think-tank/knowledge-base/pass/build-findings/kb-build-discovered-issues.md
+    复核：.think-tank/knowledge-base/pass/build-findings/verify-build-findings.md
 ```
 
 ---
@@ -76,6 +88,8 @@ GOAL_ABANDONED: {原因}
 - 验证 `pass/kb-build-qa.md` 存在（Goal 2 Stage 5 产出）
 - 验证 `.agents/skills/explore-kb/SKILL.md` 存在（Goal 3 Stage 7 迁移；Claude Code 通过 `.claude` 兼容层读取同一份文件）。若不存在但 `.claude/skills/explore-kb/SKILL.md` 存在，进入兼容模式：Journal 记录 `{action: decision, decision: legacy_skill_layout}`，继续执行
 - 验证 `.agents/skills/{{PROJECT_SLUG}}-commander/SKILL.md` 存在（可选，若装了 commander 可辅助分诊；旧布局可回退检查 `.claude/skills/{{PROJECT_SLUG}}-commander/SKILL.md`）
+- 验证 `.think-tank/knowledge-base/pass/build-findings/discovered-issues.jsonl` 存在。若不存在（旧构建或 Goal 2 遗漏），创建空文件并 Journal 记录 `{action: decision, decision: build_findings_missing}`
+- 验证 `.think-tank/indexable-docs-kb-seed/verify-build-findings.md` 存在。若缺失，Journal 记录 `{action: error, error_type: verify_task_missing}`；Stage 12.3 跳过复制并在报告中说明
 - 读取 `.think-tank/indexable-docs-kb-seed/VERSION` 获得 `seed_pack_version`
 
 任一必选缺失即终止：`GOAL_ABANDONED: 前置条件不满足，缺失 {file}`。
@@ -129,6 +143,7 @@ for batch in batches:
   spawn_sub_agents_parallel(batch)  # fresh context each
   wait_all()
   收集每个 sub-agent 的输出（按 schemas/qa-triage-output.schema.json 校验）
+  收集本批返回的 discovered_issues → 分配 DISC-xxxx → 追加到 build-findings/discovered-issues.jsonl
   写入主 Agent 会话内存的 triage_results 累积清单
   Journal 追加 batch_completed 条目（含本批 verdict 分布统计）
 ```
@@ -256,6 +271,8 @@ Goal 4 triaged at: <ISO 8601>
 3. 在 kb-build-qa.md 中把该条目标记 resolved
 
 **KB patch 应用**：查看 `pass/kb-doc-patches.md`，选定要 apply 的 patches，运行 `/maintain-kb --apply-patches`（若已实现）或手动 apply。
+
+**不要合并 discovered issues**：`kb-build-qa.md` 只放 QA 分诊结果；构建期发现的代码/流程问题在 `pass/build-findings/discovered-issues.jsonl`，不进入本报告。
 ```
 
 ### 12.2 生成 kb-doc-patches.md
@@ -293,11 +310,24 @@ Total patches: {P}
 
 若无 patch 建议：文件仍生成，仅含头部说明 + "Total patches: 0"。
 
-### 12.3 Stage 12 收尾
+### 12.3 刷新构建期发现快照与复核任务
+
+Goal 4 分诊过程中可能新增 `discovered_issues`，因此构建收官前必须重新生成快照：
+
+- 输入：`.think-tank/knowledge-base/pass/build-findings/discovered-issues.jsonl`
+- 输出：
+  - `.think-tank/knowledge-base/pass/build-findings/kb-build-discovered-issues.md`（按 infra-setup §8.3 的结构重新生成）
+  - `.think-tank/knowledge-base/pass/build-findings/verify-build-findings.md`（若不存在，从 `.think-tank/indexable-docs-kb-seed/verify-build-findings.md` 复制）
+- JSONL 为空时也生成文件，写“本构建未记录到构建期发现”
+- 快照至少包含：标题、"未确认"声明、摘要（target / seed / confidence）、目标工程问题、种子包问题、处理建议；每条保留 `DISC-xxxx`、证据、影响、建议核实方式、相关 KB 文档
+- 不修改 JSONL 中的 `status`；构建期只应出现 `recorded`
+
+### 12.4 Stage 12 收尾
 
 - 验证 kb-build-qa.md 已按 4 档重组
 - 验证 kb-doc-patches.md 已生成
 - 验证 kb-build-qa-pre-goal4.md 备份仍在
+- 验证 `pass/build-findings/kb-build-discovered-issues.md` 与 `verify-build-findings.md` 存在
 - 更新 Progress Log：`Stage 12: ✅`
 - Journal 追加 `action: goal_completed`
 
@@ -310,8 +340,8 @@ Total patches: {P}
 | Stage | 状态 | 开始时间 | 完成时间 | 耗时 | 备注 |
 |-------|------|---------|---------|------|------|
 | 10. 备份 + 解析 | ⬜ | | | | |
-| 11. 分诊 sub-agent 批并行 | ⬜ | | | | |
-| 12. 重组 kb-build-qa + 生成 patches | ⬜ | | | | |
+| 11. 分诊 sub-agent 批并行 | ⬜ | | | | 含 discovered_issues 收集 |
+| 12. 重组 kb-build-qa + 生成 patches | ⬜ | | | | 含 build-findings 刷新 |
 
 **Stage 11 batch 明细**：
 
@@ -358,4 +388,10 @@ Goal 4 已跳过（原因：{显式跳过 | explore-kb 缺失 | 其他}）
 种子包构建周期到 Goal 3 结束。
   人类可直接基于 pass/kb-build-qa.md 回答 QA 问题
   若后续想补跑分诊，随时可 /goal .think-tank/indexable-docs-kb-seed/qa-triage.md 重启 Goal 4
+
+  （仅当构建期发现 N > 0 时输出以下块）
+  构建过程中发现潜在或明确问题 {N} 项（目标工程 {X} 项 / 构建流程 {Y} 项）。
+  构建期间未做修复或确认。可查看：
+    .think-tank/knowledge-base/pass/build-findings/kb-build-discovered-issues.md
+  复核入口：.think-tank/knowledge-base/pass/build-findings/verify-build-findings.md
 ```

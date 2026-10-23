@@ -180,6 +180,24 @@ properties:
         minimum: 0
         description: "small: 2 / medium: 4 / large: 4"
 
+  # ─── build findings ────────────────────────────────
+  build_findings:
+    type: object
+    description: "构建期发现的代码/流程问题账本；只记录，不在构建期确认或修复"
+    properties:
+      jsonl_path:
+        type: string
+        default: ".think-tank/knowledge-base/pass/build-findings/discovered-issues.jsonl"
+      snapshot_output:
+        type: string
+        default: ".think-tank/knowledge-base/pass/build-findings/kb-build-discovered-issues.md"
+      verify_task_source:
+        type: string
+        default: ".think-tank/indexable-docs-kb-seed/verify-build-findings.md"
+      verify_task_output:
+        type: string
+        default: ".think-tank/knowledge-base/pass/build-findings/verify-build-findings.md"
+
   # ─── runtime ─────────────────────────────────────────
   max_turns:
     type: integer

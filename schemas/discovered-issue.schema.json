@@ -1,0 +1,156 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "urn:indexable-docs-kb:schema:discovered-issue",
+  "title": "Indexable Docs KB Seed Discovered Issue",
+  "description": "构建期发现的潜在或明确问题。构建期只写 status=recorded，不确认、不修复、不阻塞；构建后由独立复核任务更新为 confirmed / rejected / needs_more_info / duplicate / promoted。**未确认条目不得写入 troubleshooting/known-bugs.md。**",
+  "type": "object",
+  "required": [
+    "id",
+    "recorded_at",
+    "goal",
+    "stage",
+    "subject",
+    "kind",
+    "confidence",
+    "summary",
+    "evidence",
+    "status"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^DISC-[0-9]{4,}$",
+      "description": "构建期由主 Agent 分配，按发现顺序递增；例如 DISC-0001"
+    },
+    "recorded_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "goal": {
+      "type": "string",
+      "description": "发现所在的 Goal，如 kb-primer / kb-docs-bake / kb-infra-setup / kb-qa-triage"
+    },
+    "stage": {
+      "type": "string",
+      "description": "发现所在的 Stage，如 3 / 4 / 12"
+    },
+    "round": {
+      "oneOf": [
+        { "type": "integer", "minimum": 0 },
+        { "type": "string" }
+      ],
+      "description": "发现所在的 Review 轮次；非 Review 阶段可省略或写阶段名"
+    },
+    "doc_id": {
+      "type": "string",
+      "description": "发现时正在处理的 KB 文档 id（若有）"
+    },
+    "subject": {
+      "type": "string",
+      "enum": ["target-project", "seed"],
+      "description": "target-project = 目标工程代码/配置/流程；seed = 种子包协议、任务文档或构建工具"
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "code-defect",
+        "process-defect",
+        "tooling-defect",
+        "config-defect",
+        "unknown"
+      ]
+    },
+    "confidence": {
+      "type": "string",
+      "enum": ["suspected", "evidence-backed"],
+      "description": "构建期只区分疑似与有证据支撑；不设 confirmed。confirmed 由构建后复核任务写入 status。"
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 5,
+      "description": "一句话说明发现，含关键符号名"
+    },
+    "evidence": {
+      "type": "string",
+      "minLength": 5,
+      "description": "代码符号、文件、观察到的行为。禁止行号；构建期不要求复现。"
+    },
+    "impact": {
+      "type": "string",
+      "description": "可能影响；不确定时写“影响未知”"
+    },
+    "suggested_verification": {
+      "type": "string",
+      "description": "人类或构建后复核任务可执行的核实方式；构建期不执行"
+    },
+    "related_kb_doc": {
+      "type": "string",
+      "description": "相关 KB 文档路径"
+    },
+    "affected_version": {
+      "type": "string",
+      "description": "发现所在的代码版本/commit/tag（若已知）"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "recorded",
+        "confirmed",
+        "rejected",
+        "needs_more_info",
+        "duplicate",
+        "promoted"
+      ],
+      "description": "构建期只写 recorded。confirmed/rejected/needs_more_info/duplicate 由构建后独立复核任务写入；promoted 表示已提升到 troubleshooting/known-bugs.md 或 works/。"
+    },
+    "dedupe_key": {
+      "type": "string",
+      "description": "可选。主 Agent 用于去重，建议为 subject|kind|doc_id|summary 的稳定摘要"
+    },
+    "also_seen_in": {
+      "type": "array",
+      "description": "重复发现的位置，保留证据链",
+      "items": { "type": "string" }
+    },
+    "verification": {
+      "type": "object",
+      "description": "构建后复核任务写入；构建期不填",
+      "properties": {
+        "verified_at": { "type": "string", "format": "date-time" },
+        "verified_by": { "type": "string" },
+        "method": {
+          "type": "string",
+          "description": "复现命令、测试、代码核对、owner 确认等"
+        },
+        "result": {
+          "type": "string",
+          "enum": ["confirmed", "rejected", "needs_more_info", "duplicate"]
+        },
+        "target_version": { "type": "string" },
+        "notes": { "type": "string" }
+      }
+    },
+    "promotion": {
+      "type": "object",
+      "description": "确认后的提升记录；未提升不填",
+      "properties": {
+        "destination": {
+          "type": "string",
+          "enum": [
+            "troubleshooting/known-bugs.md",
+            "troubleshooting/incidents/",
+            "works/",
+            "other"
+          ]
+        },
+        "target_path": { "type": "string" },
+        "promoted_at": { "type": "string", "format": "date-time" },
+        "promoted_by": { "type": "string" },
+        "note": { "type": "string" }
+      }
+    },
+    "notes": {
+      "type": "string"
+    }
+  }
+}

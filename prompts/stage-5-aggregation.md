@@ -9,6 +9,8 @@
 
 扫描 `.think-tank/knowledge-base/pass/*.qa.jsonl`，合并、去重、分组、分类，输出 `.think-tank/knowledge-base/pass/kb-build-qa.md`。
 
+**不要读取或合并** `.think-tank/knowledge-base/pass/build-findings/discovered-issues.jsonl`：它是构建期代码/流程问题的独立账本，不是 QA 问题，也不进入 `kb-build-qa.md`。
+
 **注意**：所有路径**必须**是完整的 `.think-tank/knowledge-base/pass/` 前缀。若发现散落在其他位置的 qa.jsonl（如 `pass/xxx.qa.jsonl` 位于工程根目录、或 `.think-tank/knowledge-base/architecture/pass/xxx.qa.jsonl`），说明 Stage 3/4 sub-agent 未遵守路径规范——此时应：
 1. 记录违规位置到 Journal
 2. 主 Agent 决定：小规模散落时可**收拢**（将散落文件移到规范位置后再合并）；大规模散落时应**中止本 Stage** 并触发 Stage 3/4 重跑（因为可能有更多未被发现的散落文件）
@@ -30,6 +32,8 @@
 ### 1. 读入所有 jsonl 条目
 
 每个 jsonl 每行一个 JSON 对象。合并所有文件的所有行到统一列表。
+
+只读取 `*.qa.jsonl`；**排除** `build-findings/discovered-issues.jsonl`。若发现 `kb-build-qa.md` 中混入 `DISC-xxxx` 条目，说明 Stage 3/4 违例，记录到 Journal 并从报告中移除。
 
 ### 2. 状态解析
 

@@ -68,6 +68,41 @@
 **如果上一轮的问题已被修复**（`ROUND_NUM > 1` 时）：
 - 在原 jsonl 条目附近追加一条 `{round: N, doc_id: ..., resolves: <上一轮 entry_id>, status: resolved}`
 
+### 3.1 发现目标工程代码/流程问题（只记录）
+
+如果文档描述与代码一致，但**代码本身看起来有问题**——行为与注释/断言矛盾、明显边界遗漏、配置与实际行为不符——不要在 Review 阶段确认、修复或阻塞，也不要写进 QA jsonl。
+
+处理方式：
+
+1. 文档按代码实际行为修正（如果文档写错了）；
+2. 在返回值里增加 `discovered_issues` 数组，记录代码/流程疑似问题；
+3. 不修改目标工程源码/配置/测试，不运行构建/测试/复现命令，不要求人类即时决策。
+
+每项字段：
+
+```json
+{
+  "summary": "一句话说明发现，含关键符号名",
+  "subject": "target-project | seed",
+  "kind": "code-defect | process-defect | tooling-defect | config-defect | unknown",
+  "confidence": "suspected | evidence-backed",
+  "evidence": "符号/文件/观察到的行为；禁止行号",
+  "impact": "可能影响；不确定时写影响未知",
+  "suggested_verification": "人类或构建后复核任务可执行的核实方式；构建期不执行",
+  "related_kb_doc": "当前文档路径",
+  "affected_version": "commit/tag（若已知）"
+}
+```
+
+判定边界：
+
+- **文档与代码不一致**：修文档，属于 Review 工作，不记 `discovered_issues`；
+- **代码行为本身可能不符合预期**：只记录，不扩大调查；
+- **只是设计意图缺失**：写 QA jsonl（`design-rationale-unclear`），不要记成代码 bug；
+- **单份文档建议不超过 5 条**；更多时合并同类。
+
+主 Agent 会为这些条目分配 `DISC-xxxx` 并写入 `.think-tank/knowledge-base/pass/build-findings/discovered-issues.jsonl`。你不需要自己写这个文件。
+
 ### 4. severity 判定（严格锚定示例）
 
 **critical**：
@@ -128,7 +163,8 @@
     "minor_resolved": 0
   },
   "doc_modified": true,
-  "jsonl_appended_lines": 6
+  "jsonl_appended_lines": 6,
+  "discovered_issues": []
 }
 ```
 
@@ -137,6 +173,7 @@
 ## 硬约束
 
 - **禁止**：改写整篇文档（你是 Review 不是重写）；引用行号；分派新的 sub-agent；跨越 `COVERS_CODE` 做全局分析
+- **禁止**：把代码/流程疑似 bug 写进 QA jsonl；修改目标工程源码/配置/测试；为了确认问题运行构建、测试或复现命令；在构建期要求人类决策
 - **允许**：读 `COVERS_CODE` 之外的文件辅助理解（如共享 header），但只用来判定，不作为修正依据
 - **必须**：以源代码为唯一事实来源；符号名锚定；就高不就低判定 severity；只修正你能明确判定的错误
 

@@ -368,6 +368,28 @@ involves_modules: [...]
 
 ---
 
+## 构建期问题记录（只记录）
+
+如果你在规划文档清单时发现**目标工程代码/流程可能有问题**（行为与注释/断言矛盾、明显配置错位、构建流程异常），不要在 Goal 1 确认、修复或阻塞。
+
+在返回 JSON 顶层增加可选 `discovered_issues` 数组，每项包含：
+
+```json
+{
+  "summary": "一句话说明发现，含关键符号名",
+  "subject": "target-project | seed",
+  "kind": "code-defect | process-defect | tooling-defect | config-defect | unknown",
+  "confidence": "suspected | evidence-backed",
+  "evidence": "符号/文件/观察到的行为；禁止行号",
+  "impact": "可能影响；不确定时写影响未知",
+  "suggested_verification": "构建后复核任务可执行的核实方式；构建期不执行",
+  "related_kb_doc": "相关文档路径（若尚未生成可省略）",
+  "affected_version": "commit/tag（若已知）"
+}
+```
+
+主 Agent 会分配 `DISC-xxxx` 并写入 `.think-tank/knowledge-base/pass/build-findings/discovered-issues.jsonl`。不要修改源码/配置/测试，不要为确认问题运行构建/测试。
+
 ## 通用错误处理
 
 - 若无法识别任何模块（如源码目录空、只有配置文件）：返回 `{"error": "no_modules_identified", "detail": "..."}`，主 Agent 会决定是否终止

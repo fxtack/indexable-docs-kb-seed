@@ -44,7 +44,8 @@
 1. 所有 `{{N_TOTAL}}` 份文档已完整生成（每份的必填章节非空）
 2. Review 硬收敛（critical == 0 && medium < `{{CONVERGENCE_MEDIUM_MAX}}`），**或** 达到轮次上限进入软收敛状态
 3. `.think-tank/knowledge-base/pass/kb-build-qa.md` 已生成，包含所有 QA 条目 + 软收敛未解决项（若有）
-4. 本文档 Progress Log 中 Stage 3/4/5 三行状态均为 ✅
+4. `.think-tank/knowledge-base/pass/build-findings/discovered-issues.jsonl` 已创建（可为空文件），且 Stage 3/4 返回的 `discovered_issues` 已全部落账
+5. 本文档 Progress Log 中 Stage 3/4/5 三行状态均为 ✅
 
 达成后主 Agent 输出：
 
@@ -133,6 +134,16 @@ qa_jsonl_pattern: ".think-tank/knowledge-base/pass/{doc_id}.qa.jsonl"
 qa_output: ".think-tank/knowledge-base/pass/kb-build-qa.md"
 ```
 
+### build_findings
+
+```yaml
+# 构建期发现的代码/流程问题账本。只记录，不在构建期确认、修复或阻塞。
+jsonl_path: ".think-tank/knowledge-base/pass/build-findings/discovered-issues.jsonl"
+snapshot_output: ".think-tank/knowledge-base/pass/build-findings/kb-build-discovered-issues.md"
+verify_task_source: ".think-tank/indexable-docs-kb-seed/verify-build-findings.md"
+verify_task_output: ".think-tank/knowledge-base/pass/build-findings/verify-build-findings.md"
+```
+
 ### runtime
 
 ```yaml
@@ -146,7 +157,15 @@ journal_path: .think-tank/knowledge-base/pass/kb-seed-journal-kb-docs-bake.md
 
 ### 3.1 逐 batch 分派
 
-主 Agent 按 §参数.stage3_batches 的顺序逐 batch 执行：
+主 Agent 先初始化构建期问题账本（幂等）：
+
+```bash
+mkdir -p .think-tank/knowledge-base/pass/build-findings
+[ -f .think-tank/knowledge-base/pass/build-findings/discovered-issues.jsonl ] || \
+  : > .think-tank/knowledge-base/pass/build-findings/discovered-issues.jsonl
+```
+
+然后按 §参数.stage3_batches 的顺序逐 batch 执行：
 
 ```
 for batch in stage3_batches:
@@ -154,6 +173,7 @@ for batch in stage3_batches:
   wait_all()
   验证：每份文档的必填章节（frontmatter + 描述 + 至少 1 个正文章节）非空
   更新 index.yaml（补充 sub-agent 产出的 keywords / description 修订)
+  收集每个 sub-agent 返回的 discovered_issues → 分配 DISC-xxxx → 追加到 build-findings/discovered-issues.jsonl
   Journal 追加 stage_completed 条目（batch 级别）
 ```
 
@@ -164,6 +184,8 @@ for batch in stage3_batches:
 - `qa_jsonl_path`：**完整路径** `.think-tank/knowledge-base/pass/{doc_id}.qa.jsonl`（**必须完整路径**，不允许简写为 `pass/{doc_id}.qa.jsonl`。用 `qa_jsonl_pattern` 拼接 `doc_id` 后填入）
 
 > ⚠️ **主 Agent 分派责任**：sub-agent 会按拿到的 `qa_jsonl_path` 原样写入。若主 Agent 在分派时只传入了 `pass/xxx.qa.jsonl` 这种相对路径，sub-agent 会按自己的 CWD 解析，导致 pass 目录散落到各处（如 `.think-tank/knowledge-base/architecture/pass/`、工程根 `pass/` 等）。**分派参数必须**是以 `.think-tank/knowledge-base/pass/` 开头的完整路径。
+
+> **构建期问题只落 build-findings**：`discovered_issues` 不进 `*.qa.jsonl`，不计入 Review 收敛，也不在构建期确认或修复。详见 §5.5。
 
 ### 3.2 失败处理
 
@@ -193,6 +215,7 @@ for round_num in 1..review_max_rounds:
     # 正确：qa_jsonl_path = ".think-tank/knowledge-base/pass/" + doc_id + ".qa.jsonl"
     # 错误：qa_jsonl_path = "pass/" + doc_id + ".qa.jsonl"  ← 会导致 sub-agent 按 CWD 解析散落
   wait_all()
+  收集每份文档返回的 discovered_issues → 分配 DISC-xxxx → 追加到 build-findings/discovered-issues.jsonl
   统计：读取每个 .think-tank/knowledge-base/pass/{doc_id}.qa.jsonl，聚合本轮新增的 critical/medium/minor 数量
   判断：
     if critical == 0 && medium < convergence_criteria.medium_max:
@@ -203,8 +226,9 @@ for round_num in 1..review_max_rounds:
 
 **关键约束**：
 - 每轮的 Review sub-agent 是全新的（不继承上一轮上下文）
-- 主 Agent **只读统计数字**（jsonl 行数按 severity 分组），不读 sub-agent 的完整发现（避免上下文污染）
+- 主 Agent **只读 QA 统计数字**（jsonl 行数按 severity 分组），不读 sub-agent 的完整发现（避免上下文污染）；`discovered_issues` 只读取结构化摘要字段
 - Review sub-agent 追加到同一 jsonl，可将上一轮的条目标记 `resolved`
+- `discovered_issues` 只进 `build-findings`，不写 QA jsonl，不计入收敛，不在构建期确认或修复
 
 ### 4.2 达到轮次上限的软收敛兜底
 
@@ -214,7 +238,7 @@ for round_num in 1..review_max_rounds:
    - `round_history`：每轮该文档的 critical/medium 数量
    - `trend`：`converging`（每轮减少） / `oscillating`（反复） / `growing`（增多）
 2. Journal 追加：`{action: decision, decision: soft_convergence, unresolved: {critical: X, medium: Y}}`
-3. 未解决项写入 kb-build-qa.md 的 "Quality Warning" 章节
+3. 未解决项写入 kb-build-qa.md 的 "Quality Warning" 章节；`discovered_issues` 不写入 Quality Warning，它们属于独立的 build-findings 账本
 4. 主 Agent 输出 `GOAL_MET_WITH_WARNING`（见 §Goal 条件）
 5. 允许人类介入：追加定向 Review / 放宽阈值 / 标记 draft 文档
 
@@ -238,6 +262,8 @@ for each .think-tank/knowledge-base/pass/{doc_id}.qa.jsonl:
 按 dimension 分类（architecture / module / flow / troubleshooting）
 标注 open vs resolved
 ```
+
+**不要合并 discovered issues**：它们不在 `*.qa.jsonl` 中，已单独落到 `build-findings/discovered-issues.jsonl`。`kb-build-qa.md` 中不得出现 `DISC-xxxx` 条目，也不得把未确认的代码/流程问题写成 QA 知识缺口。
 
 **扫描散落文件（v2.0.1 新增）**：合并前，主 Agent 应执行一次全局扫描，检测是否有 sub-agent 违反路径规范导致散落：
 
@@ -333,10 +359,34 @@ Review rounds: X（hard converged / soft converged）
 ### 5.4 Stage 5 收尾
 
 - 验证 `.think-tank/knowledge-base/pass/kb-build-qa.md` 存在
+- 验证 `.think-tank/knowledge-base/pass/build-findings/discovered-issues.jsonl` 存在（可为空文件）
+- 验证 `kb-build-qa.md` 中没有 `DISC-xxxx` 条目
 - 验证 `.think-tank/knowledge-base/pass/` 下的 `{doc_id}.qa.jsonl` 全部已清理（若前置校验通过）
 - 验证工程根目录及其他位置**无遗留** `*.qa.jsonl`（散落收拢后应干净）
 - 更新 Progress Log：`Stage 5: ✅`
 - Journal 追加 `action: goal_completed`
+
+### 5.5 构建期问题账本（build-findings）
+
+**定位**：`discovered-issues.jsonl` 是构建期发现的代码/流程问题账本，不是 KB 内容，也不是 QA 问题。构建期只写 `status: recorded`；不确认、不修复、不阻塞。
+
+**写入规则**：
+
+- 主 Agent 是唯一写入者；sub-agent 只在返回值里给 `discovered_issues` 数组；
+- 文件路径固定为 `.think-tank/knowledge-base/pass/build-findings/discovered-issues.jsonl`；
+- 即使没有任何发现，也要创建空文件（Goal 3/4 会检查存在性）；
+- 每条分配 `DISC-0001` 形式的 id，按发现顺序递增；
+- 去重：按 `subject + kind + doc_id + summary` 生成稳定 key；重复项只保留 canonical，其他写入 `also_seen_in`；
+- 字段必须符合 `schemas/discovered-issue.schema.json`；构建期只使用 `status: recorded`。
+
+**构建期禁止**：
+
+- 不修改目标工程源码/配置/测试；
+- 不为确认问题运行构建、测试或复现命令；
+- 不把问题写进 `kb-build-qa.md`；
+- 不在 Goal 2 阶段请人类处理这些问题。
+
+**后续**：Goal 3/4 收官时生成人类可读快照 `kb-build-discovered-issues.md`，并复制 `verify-build-findings.md` 复核任务文档；最终提示由构建收官 Goal 负责。
 
 ---
 
@@ -346,9 +396,9 @@ Review rounds: X（hard converged / soft converged）
 
 | Stage | 状态 | 开始时间 | 完成时间 | 耗时 | 备注 |
 |-------|------|---------|---------|------|------|
-| 3. 文档生成 | ⬜ | | | | |
-| 4. Review | ⬜ | | | | |
-| 5. QA 聚合 | ⬜ | | | | |
+| 3. 文档生成 | ⬜ | | | | 含 discovered_issues 收集 |
+| 4. Review | ⬜ | | | | 不含 discovered_issues 收敛 |
+| 5. QA 聚合 | ⬜ | | | | 含 build-findings 落账校验 |
 
 **Stage 3 batch 明细**：
 

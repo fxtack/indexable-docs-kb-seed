@@ -50,6 +50,10 @@ cd /path/to/target-project
 #    Full cycle = Goal 1 -> Goal 2 -> Goal 3 -> Goal 4 (all run by default).
 #    Goal 4 (kb-qa-triage) is the last link and runs by default; it may only be
 #    skipped if a human explicitly says "skip Goal 4" or explore-kb is not installed.
+
+# 4. If pass/build-findings/ has unconfirmed items, run the independent post-build task:
+#    /goal .think-tank/knowledge-base/pass/build-findings/verify-build-findings.md
+#    Only confirmed items are promoted to troubleshooting/known-bugs.md or works/.
 ```
 
 ## File layout
@@ -63,6 +67,7 @@ cd /path/to/target-project
 | `bake.md.template` | Goal 2 template | Goal 1 Stage C fills in parameters and produces `bake-{project}.md` |
 | `infra-setup.md` | Goal 3 task document | Infrastructure + Skill migration (Stage 6 directories → Stage 7 Skills → Stage 8 completeness check) |
 | `qa-triage.md` | Goal 4 task document | Global QA triage, splitting `kb-build-qa` into four buckets. **The last link of the full cycle; runs by default** (no human confirmation needed) |
+| `verify-build-findings.md` | Post-build task document | Independent verification of build-discovered code/process issues. **Not part of the KB build cycle**; copied to `pass/build-findings/` at build end. Only confirmed items are promoted to `troubleshooting/` or `works/` |
 | `prompts/stage-a-subagent.md` | Prompt template | Goal 1 Stage A project-understanding sub-agent (includes excluded-path detection) |
 | `prompts/stage-b-subagent.md` | Prompt template | Goal 1 Stage B document-list planning sub-agent (B2 emits product-boundary fields) |
 | `prompts/stage-3-subagent.md` | Prompt template | Goal 2 Stage 3 document generation sub-agent |
@@ -73,6 +78,7 @@ cd /path/to/target-project
 | `schemas/qa-jsonl-entry.schema.json` | JSON Schema | Format of each line in a QA jsonl file |
 | `schemas/goal2-task-doc.schema.yaml` | YAML Schema | Parameter structure of the Goal 2 task document |
 | `schemas/qa-triage-output.schema.json` | JSON Schema | Goal 4 sub-agent output |
+| `schemas/discovered-issue.schema.json` | JSON Schema | Build-discovered issue ledger (`pass/build-findings/discovered-issues.jsonl`) |
 | `templates/meta-knowledge-base-guide.md.template` | Meta-spec template | Contains `{ADAPT}` markers; §3.2 covers product-view fields |
 | `templates/meta-work-guide.md` | Generic template | Usable as-is |
 | `templates/meta-runbook-guide.md` | Generic template | Usable as-is |
@@ -84,6 +90,8 @@ cd /path/to/target-project
 | `knowledge-extract-qa-guide.md` | Key meta document | Migrated to the KB root by Goal 3; defines the QA extraction workflow |
 
 > **Skill location**: Goal 3 installs skills under `.agents/skills/` (the cross-agent location used by pi and OpenCode). For Claude Code it creates a `.claude` compatibility link — a whole-directory link when `.claude` is absent, otherwise only `.claude/skills -> ../.agents/skills` so existing Claude config is preserved. It never keeps a second editable copy.
+
+> **Build-discovered issues**: issues found while building the KB are staged in `pass/build-findings/discovered-issues.jsonl` and are **not confirmed KB knowledge**. They do not enter `kb-build-qa.md` or `troubleshooting/`. The post-build task `verify-build-findings.md` independently verifies them; only `confirmed` items are promoted to `troubleshooting/known-bugs.md` or `works/`.
 
 > **Retired files**: `templates/commander/` and `prompts/stage-commander-header-gen.md` are no longer part of this pack — product-boundary fields are produced directly by Goal 1 Stage B and written into `index.yaml.modules[]`, so a standalone `module_header` file system is no longer needed.
 
@@ -121,21 +129,26 @@ Goal 1: kb-primer (analysis + planning)
 Goal 2: kb-docs-bake (deterministic execution)
   Input:  the instantiated task document from Goal 1
   Steps:  document generation (Stage 3) -> multi-round review (Stage 4) -> QA aggregation (Stage 5)
-  Output: complete KB documents + kb-build-qa.md (local view)
+  Output: complete KB documents + kb-build-qa.md (local view) + pass/build-findings/discovered-issues.jsonl (unconfirmed)
 
 Goal 3: kb-infra-setup (infrastructure + Skills)
   Input:  the KB produced by Goal 2
-  Steps:  fill in directories -> migrate Skills (explore-kb / maintain-kb / commander) -> postmortem + summary
-  Output: a ready-to-run KB environment
+  Steps:  fill in directories -> migrate Skills (explore-kb / maintain-kb / commander) -> build-findings snapshot + postmortem + summary
+  Output: a ready-to-run KB environment + pass/build-findings/ snapshot + verify task
   Note:   the former "Commander content build" Stage is gone (Stage B emits product-view fields directly)
 
 Goal 4: kb-qa-triage (the last link of the full cycle)
   Input:  the KB from Goal 3 + kb-build-qa.md
-  Steps:  back up kb-build-qa -> batch-dispatch sub-agents that answer via explore-kb -> regroup into 4 verdict buckets + KB patch suggestions
-  Output: triaged kb-build-qa.md + pass/kb-doc-patches.md (applied after human approval)
+  Steps:  back up kb-build-qa -> batch-dispatch sub-agents that answer via explore-kb -> regroup into 4 verdict buckets + KB patch suggestions -> refresh build-findings snapshot
+  Output: triaged kb-build-qa.md + pass/kb-doc-patches.md (applied after human approval) + final build-findings snapshot
   Default: starts automatically after Goal 3, no confirmation needed. Skipped only if a human says
            "skip Goal 4" or explore-kb is not installed.
   Value:  typically cuts the number of questions that reach humans by 30-60%
+
+Post-build (optional, not part of the 4-Goal cycle):
+  Task:   verify-build-findings.md
+  Input:  pass/build-findings/discovered-issues.jsonl + KB snapshot
+  Output: verification report + status updates; confirmed items are promoted to troubleshooting/ or works/
 ```
 
 Detailed design lives in `DESIGN-planning.md` (v8-ready, alongside this README).

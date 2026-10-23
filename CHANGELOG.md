@@ -5,6 +5,29 @@
 >
 > **版本线说明**：正文与代码注释中出现的 `v1.x` / `v2.0.x` 是种子包并入本仓库**之前**的结构演进编号（用于解释设计沿革，例如「产品视角字段内嵌于 `index.yaml.modules[]`」是在那一代引入的），**不属于本仓库版本线**。本仓库版本以 `VERSION` 文件与 git tag 为准。
 
+## 0.2.4 — 2026-10-23
+
+### 问题
+构建 KB 时可能发现目标工程代码/流程本身有问题，但此前没有独立记录通道：这类发现要么混进 `kb-build-qa.md`，要么被构建 Agent 顺手确认/修复，干扰“知识库构建只关注构建本身”的边界；同时 `troubleshooting/known-bugs.md` 是已确认知识，未确认条目不能直接写入。
+
+### 变更
+- **新增构建期问题账本**：`pass/build-findings/discovered-issues.jsonl`，由主 Agent 唯一写入；Stage 3 / Stage 4 / Goal 4 sub-agent 通过返回值 `discovered_issues` 上报。
+- **新增 `schemas/discovered-issue.schema.json`**：定义 `status: recorded / confirmed / rejected / needs_more_info / duplicate / promoted` 生命周期；构建期只写 `recorded`。
+- **构建期硬边界**：不修改目标工程源码/配置/测试；不为确认问题运行构建/测试/复现；不写进 QA、不计入收敛、不在构建期请人类处理。
+- **Goal 3 / Goal 4 收官生成人类可读快照**：`pass/build-findings/kb-build-discovered-issues.md`，并在最终 GOAL_MET / 跳过 Goal 4 的路径中提示。
+- **新增构建后复核任务文档** `verify-build-findings.md`（**不是 skill**）：独立上下文复核每条发现，允许跑测试/复现；确认后才提升到 `troubleshooting/known-bugs.md`、`troubleshooting/incidents/` 或 `works/`。构建收官时复制到 `pass/build-findings/`。
+- **明确 `pass/` 语义**：从“外部输入只读中转”扩展为“构建期产物 + 外部输入中转（不入索引）”；未确认的 build-findings 不作为 KB 知识使用。
+- README / README-ZH / DESIGN-planning / explore-kb / KB README 模板同步更新。
+
+### 兼容性
+- 不改变 KB 结构、`index.yaml` 或 QA 分诊协议。
+- 旧构建若没有 `pass/build-findings/discovered-issues.jsonl`，Goal 3/4 会创建空文件并记录 `build_findings_missing`，不阻塞。
+- `troubleshooting/` 仍然只收已确认知识；未确认条目留在 `pass/build-findings/`。
+
+### 影响
+- 构建期发现不再污染 QA 收敛与 Goal 4 分诊，也不会被误写进 `known-bugs.md`。
+- 人类在构建收官时看到一份集中、带证据、明确标注“未确认”的问题记录，并可选择执行独立复核任务。
+
 ## 0.2.3 — 2026-10-23
 
 ### 问题

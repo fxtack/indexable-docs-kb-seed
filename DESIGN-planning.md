@@ -530,7 +530,23 @@ Stage 5: QA 聚合
 - 所有文档完整（N 份）
 - Review 收敛（0 critical + medium < 收敛阈值）
 - `kb-build-qa.md` 已生成
+- `pass/build-findings/discovered-issues.jsonl` 已创建（可为空）
 - Agent 输出：`GOAL_MET: kb-docs-bake 完成。文档 N 份，QA 问题 M 项（含已 resolved K 项）。请人类回答 kb-build-qa.md 中的问题。`
+
+### 4.6 构建期问题账本：build-findings
+
+**动机**：构建期会读到大量代码，可能发现目标工程代码/流程本身有问题。这类发现既不是「文档与代码不一致」（应该修文档），也不是「代码读不出来的设计意图」（应该进 QA）。如果混进 QA，会污染 Review 收敛判据和 Goal 4 分诊；如果直接写进 `troubleshooting/known-bugs.md`，又会把未确认猜测当成 KB 知识。
+
+**协议**：
+
+- Stage 3 / Stage 4 / Goal 4 sub-agent 在返回值中增加 `discovered_issues: []`；只记录，不确认、不修复、不阻塞。
+- 主 Agent 是唯一写入者：分配 `DISC-xxxx`，追加到 `.think-tank/knowledge-base/pass/build-findings/discovered-issues.jsonl`。
+- 字段遵循 `schemas/discovered-issue.schema.json`；构建期只写 `status: recorded`。
+- `discovered_issues` 不进入 `*.qa.jsonl`、`kb-build-qa.md`，不计入 Review 收敛。
+- Goal 3 / Goal 4 收官时从 JSONL 生成 `kb-build-discovered-issues.md` 快照，并复制 `verify-build-findings.md` 复核任务文档。
+- 构建期硬边界：不修改目标工程源码/配置/测试；不为确认问题运行构建/测试/复现；不在构建期请人类处理。
+
+**为什么不直接放 `troubleshooting/`**：`known-bugs.md` 在 TS 四级检索链里，读者会把它当已确认事实；未确认条目会污染检索，也违背「构建期只记录、复核期才定性」的分工。
 
 ---
 
@@ -573,7 +589,8 @@ Stage 8: 完整性检查 + 收尾
 
 | 操作 | 文件/目录 | 说明 |
 |------|----------|------|
-| 创建目录 | `pass/` | 如不存在。用于存放 Q&A jsonl、maintain-kb 检查报告、外部输入材料 |
+| 创建目录 | `pass/` | 如不存在。构建期产物 + 外部输入中转：Q&A jsonl、Journal、postmortem、summary、build-findings、maintain-kb 检查报告、外部输入材料 |
+| 创建目录 | `pass/build-findings/` | 构建期代码/流程问题账本与构建后复核任务；未确认条目不进 troubleshooting |
 | 创建目录 | `works/` | 如不存在。用于存放 Work 文档。需包含 `.meta-work-guide.md`（已在 Goal 1 中生成） |
 | 创建目录 | `develop/` | 如不存在。用于存放研发规范文档（初始为空，后续按需创建） |
 | 创建目录 | `troubleshooting/incidents/` | 如不存在 |
@@ -714,6 +731,7 @@ Sub-agent 任务：
   [ ] .think-tank/knowledge-base/troubleshooting/runbooks/.meta-runbook-guide.md
   [ ] .think-tank/knowledge-base/troubleshooting/incidents/.meta-incident-guide.md
   [ ] .think-tank/knowledge-base/troubleshooting/.meta-ts-output-template.md（如有）
+  [ ] .think-tank/knowledge-base/pass/build-findings/discovered-issues.jsonl
   [ ] .agents/skills/explore-kb/SKILL.md
   [ ] .agents/skills/maintain-kb/SKILL.md
   [ ] .agents/skills/{{PROJECT_SLUG}}-commander/SKILL.md
@@ -722,18 +740,21 @@ Sub-agent 任务：
 
 目录项：
   [ ] pass/ 存在
+  [ ] pass/build-findings/ 存在
   [ ] works/ 存在
   [ ] develop/ 存在
   [ ] troubleshooting/incidents/ 存在
 
 收尾：
+  [ ] pass/build-findings/kb-build-discovered-issues.md 已生成（构建期发现快照）
+  [ ] pass/build-findings/verify-build-findings.md 已复制（构建后复核任务）
   [ ] pass/kb-seed-postmortem.md 已生成（聚合三个 Goal 的异常信号和统计）
   [ ] pass/kb-seed-summary.md 已生成（人类可读的构建完成证书）
 ```
 
 **postmortem 生成**（由主 Agent 或分派一个 sub-agent）：读取三个 Journal 文件，聚合异常信号。包含：各 Goal 耗时、异常统计、重试率、最常见错误类型、关键决策记录、流程优化建议。
 
-**summary 生成**（由主 Agent）：一页纸的构建完成摘要。包含：三个 Goal 完成状态、总耗时、文档数量（A/F/M/T）、QA 问题统计、Skill 安装位置与 `.claude` 兼容层状态、关键决策、下一步行动。
+**summary 生成**（由主 Agent）：一页纸的构建完成摘要。包含：三个 Goal 完成状态、总耗时、文档数量（A/F/M/T）、QA 问题统计、Skill 安装位置与 `.claude` 兼容层状态、构建期发现数量与复核入口、关键决策、下一步行动。
 
 **Goal 3 完成条件**：
 - 所有必选项文件存在
@@ -820,6 +841,7 @@ Stage 12: 重组 kb-build-qa.md + 生成 kb-doc-patches.md
 - `pass/kb-build-qa.md` 重组为 4 档结构
 - `pass/kb-doc-patches.md` 生成（含所有 sub-agent 的 patch 建议，若无则为空文件带说明头）
 - 所有 QA 条目均已分诊（含 abandoned——重试上限失败的项，保守归入 cannot_answer_needs_human）
+- `pass/build-findings/kb-build-discovered-issues.md` 已刷新，`verify-build-findings.md` 已就位
 - Progress Log 中 Stage 10 / 11 / 12 均为 ✅
 - Agent 输出：`GOAL_MET: kb-qa-triage 完成。原始 N 项 → fully_answered A / partially_answered B / cannot_answer_needs_human C / should_not_be_a_question D。人类回答负担减少 (A+D)/N * 100%。`
 
@@ -828,6 +850,27 @@ Stage 12: 重组 kb-build-qa.md + 生成 kb-doc-patches.md
 - **可能过度自信**：sub-agent 有把 partially_answered 判为 fully_answered 的风险；对冲手段是交叉验证 + 人类审阅 fully_answered 分组的选项
 - **依赖 explore-kb 质量**：若 explore-kb 检索能力不足（如关键词覆盖不全），Goal 4 会把本该 partially_answered 的问题判为 cannot_answer_needs_human，导致人类回答负担减少不明显。这是可以通过完善 KB 关键词/module_header 自然改善的
 - **首次运行建议人工抽查判定分布**（尤其 fully_answered 分组与交叉验证结果）
+
+### 5.7 构建后复核任务：verify-build-findings
+
+**定位**：`verify-build-findings.md` 是构建完成后的独立任务文档，**不是 Goal 5，也不属于 Goal 1-4 的构建周期**。它不注册为 skill，避免被 Agent 在日常任务中误触发；只在构建收官提示后由人类或独立 Agent 显式执行。
+
+**流程**：
+
+```
+输入：pass/build-findings/discovered-issues.jsonl + kb-build-discovered-issues.md
+  └── 独立上下文重新核实每条 recorded 发现（允许读代码、跑测试/复现）
+  └── 写回 status: confirmed / rejected / needs_more_info / duplicate
+  └── 生成 pass/build-findings/verification-report.md
+  └── 人类批准后，confirmed 条目提升到 troubleshooting/known-bugs.md / incidents/ 或 works/
+  └── 写回 status: promoted
+```
+
+**关键边界**：
+
+- 复核允许跑验证，但默认不修改目标工程源码；修复是另一个任务。
+- 未确认条目不写入 `troubleshooting/`。
+- 任务文档在构建收官时复制到 `pass/build-findings/verify-build-findings.md`，种子包目录删除后仍可执行。
 
 ---
 
@@ -1332,6 +1375,7 @@ v6 起明确职责分离，消除 v5 版本中两者维护重叠的问题：
 | `templates/meta-incident-guide.md` | 通用模板 | 直接可用 |
 | `schemas/stage-b-output.schema.json` | Schema | Stage B sub-agent 输出格式 |
 | `schemas/qa-jsonl-entry.schema.json` | Schema | QA jsonl 每行的格式 |
+| `schemas/discovered-issue.schema.json` | Schema | 构建期发现账本（`pass/build-findings/discovered-issues.jsonl`）的格式 |
 | `schemas/goal2-task-doc.schema.yaml` | Schema | Goal 2 任务文档的参数结构 |
 | `prompts/stage-a-subagent.md` | Prompt 模板 | Stage A 的 sub-agent prompt |
 | `prompts/stage-b-subagent.md` | Prompt 模板 | Stage B 的 sub-agent prompt |
@@ -1342,6 +1386,7 @@ v6 起明确职责分离，消除 v5 版本中两者维护重叠的问题：
 | `skills/maintain-kb/` | Skill | 已去耦合，直接复制。Goal 3 Stage 7 迁移到 `.agents/skills/maintain-kb/` |
 | `skills/commander/` | Skill（模板化） | v1.1 新增。含 SKILL.md + 5 references。模板层使用 `{{PROJECT_NAME}}` / `{{PROJECT_SLUG}}` 占位符；模块/流程清单从 `index.yaml` 运行时读取，不内联到 description。Goal 3 Stage 7 迁移到 `.agents/skills/{{PROJECT_SLUG}}-commander/`，边复制边替换占位符（`{ADAPT}` 标记保留） |
 | `qa-triage.md` | Goal 4 任务文档 | 全局 QA 分诊：把 `kb-build-qa.md` 重组为 4 档 verdict + 产出 `kb-doc-patches.md`。默认执行 |
+| `verify-build-findings.md` | 构建后任务文档 | 对构建期发现做独立复核（不属于 Goal 1-4，不注册为 skill）；确认后才提升到 `troubleshooting/` 或 `works/` |
 | `templates/kb-readme.md.template` | 元文档模板 | 含 `{ADAPT}` 标记。Goal 3 Stage 6 用于生成 KB 根 `README.md` |
 | `knowledge-extract-qa-guide.md` | 关键元文档 | 通用文档，定义 QA 提取工作流（内嵌格式规范，替代 qa-template.md）。Goal 3 中迁移 |
 

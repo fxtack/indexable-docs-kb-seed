@@ -90,6 +90,28 @@
       "minimum": 0,
       "description": "本次分诊过程中 sub-agent 调用 explore-kb 的次数（供 Journal 记录用于成本追溯）"
     },
+    "discovered_issues": {
+      "type": "array",
+      "description": "分诊过程中发现的目标工程代码/流程问题。只记录、不确认、不修复；主 Agent 汇总到 pass/build-findings/discovered-issues.jsonl。未发现时返回空数组。",
+      "items": {
+        "type": "object",
+        "required": ["summary", "subject", "kind", "confidence", "evidence"],
+        "properties": {
+          "summary": { "type": "string", "minLength": 5 },
+          "subject": { "type": "string", "enum": ["target-project", "seed"] },
+          "kind": {
+            "type": "string",
+            "enum": ["code-defect", "process-defect", "tooling-defect", "config-defect", "unknown"]
+          },
+          "confidence": { "type": "string", "enum": ["suspected", "evidence-backed"] },
+          "evidence": { "type": "string", "minLength": 5 },
+          "impact": { "type": "string" },
+          "suggested_verification": { "type": "string" },
+          "related_kb_doc": { "type": "string" },
+          "affected_version": { "type": "string" }
+        }
+      }
+    },
     "notes": {
       "type": "string",
       "description": "可选。sub-agent 想额外说明的内容"

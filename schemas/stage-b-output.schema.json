@@ -5,6 +5,30 @@
   "description": "Stage B 的 sub-agent 输出结构。4 个维度共享此 schema，用 dimension 字段区分具体形态。",
   "type": "object",
   "required": ["dimension"],
+  "properties": {
+    "discovered_issues": {
+      "type": "array",
+      "description": "可选。规划过程中发现的目标工程代码/流程问题；只记录、不确认、不修复。主 Agent 汇总到 pass/build-findings/discovered-issues.jsonl。",
+      "items": {
+        "type": "object",
+        "required": ["summary", "subject", "kind", "confidence", "evidence"],
+        "properties": {
+          "summary": { "type": "string", "minLength": 5 },
+          "subject": { "type": "string", "enum": ["target-project", "seed"] },
+          "kind": {
+            "type": "string",
+            "enum": ["code-defect", "process-defect", "tooling-defect", "config-defect", "unknown"]
+          },
+          "confidence": { "type": "string", "enum": ["suspected", "evidence-backed"] },
+          "evidence": { "type": "string", "minLength": 5 },
+          "impact": { "type": "string" },
+          "suggested_verification": { "type": "string" },
+          "related_kb_doc": { "type": "string" },
+          "affected_version": { "type": "string" }
+        }
+      }
+    }
+  },
   "oneOf": [
     { "$ref": "#/$defs/architectureOutput" },
     { "$ref": "#/$defs/modulesOutput" },

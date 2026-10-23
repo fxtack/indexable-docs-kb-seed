@@ -48,6 +48,10 @@ cd /path/to/target-project
 #    完整构建周期 = Goal 1 → Goal 2 → Goal 3 → Goal 4（默认全部执行）
 #    Goal 4 (kb-qa-triage) 是最后一环，默认执行；仅当人类显式说"跳过 Goal 4"
 #    或 explore-kb 未安装时才允许绕过
+
+# 4. 若 pass/build-findings/ 有未确认条目，运行构建后的独立复核任务：
+#    /goal .think-tank/knowledge-base/pass/build-findings/verify-build-findings.md
+#    只有确认属实的条目才提升到 troubleshooting/known-bugs.md 或 works/。
 ```
 
 ## 文件清单
@@ -61,6 +65,7 @@ cd /path/to/target-project
 | `bake.md.template` | Goal 2 模板 | Goal 1 Stage C 填充参数后生成 `bake-{project}.md` |
 | `infra-setup.md` | Goal 3 任务文档 | 基础设施搭建 + Skill 迁移（Stage 6 目录补齐 → Stage 7 Skill 迁移 → Stage 8 完整性检查） |
 | `qa-triage.md` | Goal 4 任务文档 | 全局视角 QA 分诊，将 kb-build-qa 分为 4 档。**种子包完整构建周期的最后一环，默认执行**（无需人类确认） |
+| `verify-build-findings.md` | 构建后任务文档 | 对构建期发现的代码/流程问题进行独立复核。**不属于 KB 构建周期**；构建收官时复制到 `pass/build-findings/`。只有确认属实的条目才提升到 `troubleshooting/` 或 `works/` |
 | `prompts/stage-a-subagent.md` | Prompt 模板 | Goal 1 Stage A 工程理解 sub-agent（含排除路径识别） |
 | `prompts/stage-b-subagent.md` | Prompt 模板 | Goal 1 Stage B 文档清单规划 sub-agent（B2 输出含产品视角边界字段） |
 | `prompts/stage-3-subagent.md` | Prompt 模板 | Goal 2 Stage 3 文档生成 sub-agent |
@@ -71,6 +76,7 @@ cd /path/to/target-project
 | `schemas/qa-jsonl-entry.schema.json` | JSON Schema | QA jsonl 每行的格式 |
 | `schemas/goal2-task-doc.schema.yaml` | YAML Schema | Goal 2 任务文档的参数结构 |
 | `schemas/qa-triage-output.schema.json` | JSON Schema | Goal 4 sub-agent 输出格式 |
+| `schemas/discovered-issue.schema.json` | JSON Schema | 构建期发现账本（`pass/build-findings/discovered-issues.jsonl`） |
 | `templates/meta-knowledge-base-guide.md.template` | 元规范模板 | 含 `{ADAPT}` 标记；§3.2 含产品视角字段规范 |
 | `templates/meta-work-guide.md` | 通用模板 | 直接可用 |
 | `templates/meta-runbook-guide.md` | 通用模板 | 直接可用 |
@@ -82,6 +88,8 @@ cd /path/to/target-project
 | `knowledge-extract-qa-guide.md` | 关键元文档 | Goal 3 迁移到 KB 根目录，定义 QA 提取工作流 |
 
 > **Skill 位置**：Goal 3 将 skill 安装到 `.agents/skills/`（pi / OpenCode 使用的跨 Agent 中立位置）。Claude Code 通过 `.claude` 兼容层读取——`.claude` 不存在时整目录软链到 `.agents`，已存在时只建立 `.claude/skills -> ../.agents/skills`，保留 `.claude` 下的其他配置；不维护第二份可编辑副本。
+
+> **构建期发现**：构建 KB 时发现的代码/流程问题暂存到 `pass/build-findings/discovered-issues.jsonl`，**不是已确认的 KB 知识**，不进入 `kb-build-qa.md` 或 `troubleshooting/`。构建完成后由 `verify-build-findings.md` 独立复核；只有 `confirmed` 条目才提升到 `troubleshooting/known-bugs.md` 或 `works/`。
 
 > **历史文件**：`templates/commander/` 与 `prompts/stage-commander-header-gen.md` 已不在本种子包内——模块的产品视角边界字段由 Goal 1 Stage B 直接产出并写入 `index.yaml.modules[]`，不再需要独立的 module_header 文件体系。
 
@@ -119,20 +127,25 @@ Goal 1: kb-primer（分析 + 规划）
 Goal 2: kb-docs-bake（确定性执行）
   输入：Goal 1 生成的实例化任务文档
   过程：文档内容生成（Stage 3） → 多轮 Review（Stage 4） → QA 聚合（Stage 5）
-  产出：完整 KB 文档 + kb-build-qa.md（局部视角）
+  产出：完整 KB 文档 + kb-build-qa.md（局部视角） + pass/build-findings/discovered-issues.jsonl（未确认）
 
 Goal 3: kb-infra-setup（基础设施 + Skill）
   输入：Goal 2 产出的 KB
-  过程：目录补齐 → Skill 迁移（explore-kb / maintain-kb / 可选 commander） → postmortem + summary
-  产出：就绪的 KB 运行环境
+  过程：目录补齐 → Skill 迁移（explore-kb / maintain-kb / 可选 commander） → build-findings 快照 + postmortem + summary
+  产出：就绪的 KB 运行环境 + pass/build-findings/ 快照与复核任务
   注：原「Commander 内容构建」Stage 已移除（产品视角字段由 Stage B 直接产出）
 
 Goal 4: kb-qa-triage（种子包完整构建周期的最后一环）
   输入：Goal 3 完成的 KB + kb-build-qa.md
-  过程：备份 kb-build-qa → 批并行分派 sub-agent 用 explore-kb 全局回答 → 重组为 4 档 + 生成 KB patch 建议
-  产出：4 档分诊后的 kb-build-qa.md + pass/kb-doc-patches.md（人类批准后 apply）
+  过程：备份 kb-build-qa → 批并行分派 sub-agent 用 explore-kb 全局回答 → 重组为 4 档 + 生成 KB patch 建议 → 刷新 build-findings 快照
+  产出：4 档分诊后的 kb-build-qa.md + pass/kb-doc-patches.md（人类批准后 apply） + 最终 build-findings 快照
   默认行为：Goal 3 完成后**默认自动启动**，无需人类确认。仅当人类显式说"跳过 Goal 4"或 explore-kb 未安装时才绕过
   价值：显著减少流入人类回答阶段的问题数量（通常减少 30-60%）
+
+构建后（可选，不属于 4-Goal 周期）：
+  任务：verify-build-findings.md
+  输入：pass/build-findings/discovered-issues.jsonl + KB 快照
+  产出：复核报告 + 状态回写；确认项提升到 troubleshooting/ 或 works/
 ```
 
 详细设计见 `DESIGN-planning.md`（v8-ready，与本种子包同级）。

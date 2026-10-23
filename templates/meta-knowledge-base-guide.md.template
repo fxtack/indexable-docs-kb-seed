@@ -84,8 +84,9 @@
 ├── works/                               # 研发任务中枢
 │   └── .meta-work-guide.md              #   Work 文档格式规范
 │
-└── pass/                                # 上游输入：外部只读参考材料
-    └── ...                              #   只读，不修改
+└── pass/                                # 构建期产物 + 外部输入中转
+    ├── build-findings/                  #   构建期发现账本（未确认，不入索引）
+    └── ...                              #   构建 QA / Journal / 只读输入
 ```
 
 ### 2.2 层级结构的职责划分
@@ -98,7 +99,7 @@
 | **问题排查层** | `troubleshooting/` | 桥接用户症状与底层实现——通过 symptom-index 将用户可观察现象映射到结构化诊断 Runbook | 行动导向、结构化决策树、双层模型（Incident 输入 + Runbook 输出） |
 | **研发规范层** | `develop/` | 记录研发行为准则——如何操作、编码约定、检查清单。回答"怎么做" | 指令性、按需查阅、与设计文档互补 |
 | **研发任务层** | `works/` | 研发任务的中枢载体。承载原始需求、设计决策、Phase 实施计划与进度 | 任务驱动、随研发推进动态更新 |
-| **上游输入层** | `pass/` | 外部评审/支持产出的只读参考材料，经消化后转化为 `works/` 或代码 | 只读、不修改、临时中转 |
+| **构建期产物 / 上游输入层** | `pass/` | 构建 QA、Journal、build-findings 与外部只读参考材料；经消化后转化为 `works/`、代码或 troubleshooting | 只读、不修改、不入索引；build-findings 未确认前不是 KB 知识 |
 
 ### 2.3 层级间的关系
 
@@ -111,7 +112,7 @@ graph TD
     TROUBLE["troubleshooting/<br/><i>问题排查</i>"]
     DEV["develop/<br/><i>研发规范</i>"]
     WORKS["works/<br/><i>设计决策与实施记录</i>"]
-    PASS["pass/<br/><i>上游输入源 · 只读</i>"]
+    PASS["pass/<br/><i>构建期产物 + 外部输入 · 只读</i>"]
 
     INDEX --> ARCH
     INDEX --> MODS
@@ -132,7 +133,7 @@ graph TD
 - `troubleshooting/runbooks/` 入 `index.yaml` 索引，作为 AI Agent 的检索目标；`troubleshooting/incidents/` 不入索引
 - `develop/` 记录**如何做**（操作规范），`works/` 记录**研发任务全过程**（需求 → 决策 → 计划 → 实施 → 归档）
 - `works/` 是研发任务的执行中枢
-- `pass/` 是外部输入的只读中转站。`pass/` 中的文档**不入 `index.yaml` 索引**
+- `pass/` 是构建期产物与外部输入的只读中转站。`pass/` 中的文档**不入 `index.yaml` 索引**；`pass/build-findings/` 中未确认的条目不是 KB 知识，不得当作 `troubleshooting/known-bugs.md` 使用
 
 ---
 
@@ -512,14 +513,23 @@ refs:
 
 详见 `works/.meta-work-guide.md`。
 
-### 7.2 pass/ — 上游输入层
+### 7.2 pass/ — 构建期产物与上游输入层
 
-`pass/` 目录存放外部产出的**只读参考材料**：外部性能测试报告、客户需求反馈、第三方审查意见等。
+`pass/` 存放两类**不入索引**的材料：
+
+1. **构建期产物**：`kb-build-qa.md`、`kb-seed-journal-*.md`、`kb-seed-postmortem.md`、`kb-seed-summary.md`、`build-findings/` 等；
+2. **外部只读参考材料**：外部性能测试报告、客户需求反馈、第三方审查意见等。
 
 **使用约束**：
-- ⚠️ `pass/` 中的文件**只读、不修改**
+- ⚠️ `pass/` 中的文件**只读、不修改**（构建期由对应任务写入；构建后只读）
 - ⚠️ `pass/` 中的文档**不入 `index.yaml` 索引**
-- 消化后的产物放入 `works/` 或直接修改代码
+- 消化后的产物放入 `works/`、`troubleshooting/` 或直接修改代码
+
+**build-findings 的特别约束**：
+
+- `pass/build-findings/discovered-issues.jsonl` 是构建期发现的代码/流程问题账本，构建期只写 `status: recorded`；
+- 未确认条目**不是 KB 知识**，不写入 `troubleshooting/known-bugs.md`；
+- 构建完成后由 `pass/build-findings/verify-build-findings.md` 独立复核；只有 `confirmed` 条目才提升到 `troubleshooting/` 或 `works/`。
 
 ---
 
