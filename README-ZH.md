@@ -25,7 +25,7 @@
 
 - 目标工程必须是 git 仓库根目录（存在 `.git`）
 - 目标工程尚未构建过知识库（不存在 `.think-tank/knowledge-base/index.yaml`）
-- 支持 `/goal` 驱动多 Agent 编排的 Claude Code 环境
+- 支持 `/goal` 驱动多 Agent 编排的 Agent 环境（如 Claude Code、pi）
 - API 配额充足（中型工程预计 10-15M tokens）
 
 ### 四步走（加一步元认知）
@@ -41,7 +41,7 @@ cp -r indexable-docs-kb-seed /path/to/target-project/.think-tank/
 
 # 2. 进入目标工程，启动 Goal 1
 cd /path/to/target-project
-# 在 Claude Code 中：/goal .think-tank/indexable-docs-kb-seed/primer.md
+# 在 Agent 中（Claude Code / pi）：/goal .think-tank/indexable-docs-kb-seed/primer.md
 
 # 3. Goal 1 完成后会生成实例化的 Goal 2 任务文档，人类可 review 文档清单和"预计成本"章节，
 #    然后启动 Goal 2 → Goal 3 → Goal 4
@@ -76,16 +76,18 @@ cd /path/to/target-project
 | `templates/meta-runbook-guide.md` | 通用模板 | 直接可用 |
 | `templates/meta-incident-guide.md` | 通用模板 | 直接可用 |
 | `templates/kb-readme.md.template` | KB README 模板 | Goal 3 Stage 6 用于生成 KB 根 README |
-| `skills/explore-kb/` | Skill | 去耦合版，Goal 3 Stage 7 迁移到 `.claude/skills/` |
-| `skills/maintain-kb/` | Skill | 去耦合版，Goal 3 Stage 7 迁移到 `.claude/skills/` |
-| `skills/commander/` | Skill | 模板化版。**模板层**仅含 `{{PROJECT_NAME}}` / `{{PROJECT_SLUG}}` / `{{MODULE_LIST}}` / `{{FLOW_LIST}}` 占位符；**示例层**取自 Redis 8.10.2（公共领域工程）。Goal 3 Stage 7 模板化迁移到 `.claude/skills/{{PROJECT_SLUG}}-commander/` |
+| `skills/explore-kb/` | Skill | 去耦合版，Goal 3 Stage 7 迁移到 `.agents/skills/`（Claude Code 通过 `.claude` 兼容层读取同一份文件） |
+| `skills/maintain-kb/` | Skill | 去耦合版，Goal 3 Stage 7 迁移到 `.agents/skills/` |
+| `skills/commander/` | Skill | 模板化版。**模板层**仅含 `{{PROJECT_NAME}}` / `{{PROJECT_SLUG}}` 占位符；模块/流程清单在运行时从 `index.yaml` 读取，不再内联到 skill description。**示例层**取自 Redis 8.10.2（公共领域工程）。Goal 3 Stage 7 模板化迁移到 `.agents/skills/{{PROJECT_SLUG}}-commander/` |
 | `knowledge-extract-qa-guide.md` | 关键元文档 | Goal 3 迁移到 KB 根目录，定义 QA 提取工作流 |
+
+> **Skill 位置**：Goal 3 将 skill 安装到 `.agents/skills/`（pi / OpenCode 使用的跨 Agent 中立位置）。Claude Code 通过 `.claude` 兼容层读取——`.claude` 不存在时整目录软链到 `.agents`，已存在时只建立 `.claude/skills -> ../.agents/skills`，保留 `.claude` 下的其他配置；不维护第二份可编辑副本。
 
 > **历史文件**：`templates/commander/` 与 `prompts/stage-commander-header-gen.md` 已不在本种子包内——模块的产品视角边界字段由 Goal 1 Stage B 直接产出并写入 `index.yaml.modules[]`，不再需要独立的 module_header 文件体系。
 
 ## 示例层与模板层的边界
 
-- **模板层**：只含占位符（`{{PROJECT_NAME}}` / `{{PROJECT_SLUG}}` / `{{MODULE_LIST}}` / `{{FLOW_LIST}}`），迁移时替换为目标工程的值；
+- **模板层**：只含占位符（`{{PROJECT_NAME}}` / `{{PROJECT_SLUG}}`），迁移时替换为目标工程的值；模块/流程清单在运行时从 `index.yaml` 读取，不内联到 description；
 - **示例层**：具体命令、模块 id、机制说明，取自 Redis 8.10.2（公共领域工程），仅作教学用，可整体替换或删除；
 - 两层不得混写：模板层不写死具体工程的命令或 id，示例层不伪装成必须保留的内容。
 

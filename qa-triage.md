@@ -74,8 +74,8 @@ GOAL_ABANDONED: {原因}
 主 Agent 执行：
 
 - 验证 `pass/kb-build-qa.md` 存在（Goal 2 Stage 5 产出）
-- 验证 `.claude/skills/explore-kb/SKILL.md` 存在（Goal 3 Stage 7 迁移）
-- 验证 `.claude/skills/{{PROJECT_SLUG}}-commander/SKILL.md` 存在（可选，若装了 commander 可辅助分诊）
+- 验证 `.agents/skills/explore-kb/SKILL.md` 存在（Goal 3 Stage 7 迁移；Claude Code 通过 `.claude` 兼容层读取同一份文件）。若不存在但 `.claude/skills/explore-kb/SKILL.md` 存在，进入兼容模式：Journal 记录 `{action: decision, decision: legacy_skill_layout}`，继续执行
+- 验证 `.agents/skills/{{PROJECT_SLUG}}-commander/SKILL.md` 存在（可选，若装了 commander 可辅助分诊；旧布局可回退检查 `.claude/skills/{{PROJECT_SLUG}}-commander/SKILL.md`）
 - 读取 `.think-tank/indexable-docs-kb-seed/VERSION` 获得 `seed_pack_version`
 
 任一必选缺失即终止：`GOAL_ABANDONED: 前置条件不满足，缺失 {file}`。
@@ -345,7 +345,7 @@ Goal 4 是 **种子包完整构建周期的最后一环**（Goal 1-4 的第 4 �
 
 以下情形允许主 Agent 跳过 Goal 4，直接把 `pass/kb-build-qa.md` 交给人类回答：
 
-1. **技术阻塞**：`.claude/skills/explore-kb/SKILL.md` 未安装（Goal 3 Stage 7 应已迁移，若缺失说明 Goal 3 未完成，属于依赖失败）
+1. **技术阻塞**：`.agents/skills/explore-kb/SKILL.md`（或旧布局 `.claude/skills/explore-kb/SKILL.md`）未安装（Goal 3 Stage 7 应已迁移，若缺失说明 Goal 3 未完成，属于依赖失败）
 2. **人类显式跳过**：人类在 Goal 3 完成或 Goal 4 启动后，**明确用自然语言**（如"跳过 Goal 4"/"直接进入人工回答"/"这次不做分诊"）要求跳过
 3. **本 Goal 触发 GOAL_ABANDONED**（见 §出工条件）
 

@@ -32,9 +32,10 @@
 - `.think-tank/knowledge-base/troubleshooting/incidents/.meta-incident-guide.md`
 
 **Skill**：
-- `.claude/skills/explore-kb/SKILL.md`（必装）
-- `.claude/skills/maintain-kb/SKILL.md`（必装）
-- `.claude/skills/{{PROJECT_SLUG}}-commander/SKILL.md`（**必装**——种子包内含 Commander skill 模板，Stage 7 自动执行模板化迁移。这是 KB 产品级决策入口，Goal 4 kb-qa-triage 也依赖 Commander 辅助分诊）
+- `.agents/skills/explore-kb/SKILL.md`（必装）
+- `.agents/skills/maintain-kb/SKILL.md`（必装）
+- `.agents/skills/{{PROJECT_SLUG}}-commander/SKILL.md`（**必装**——种子包内含 Commander skill 模板，Stage 7 自动执行模板化迁移。这是 KB 产品级决策入口，Goal 4 kb-qa-triage 也依赖 Commander 辅助分诊）
+- `.claude` 兼容层：`.claude` 或 `.claude/skills` 指向 `.agents`（Claude Code 读取同一份 skill；不维护第二份副本）
 
 **目录**：
 - `pass/` / `works/` / `develop/` / `troubleshooting/incidents/`
@@ -47,7 +48,7 @@
 
 ```
 GOAL_MET: kb-infra-setup 完成。
-  基础设施就绪 / Skill 已安装（explore-kb, maintain-kb, {{PROJECT_SLUG}}-commander）
+  基础设施就绪 / Skill 已安装到 .agents/skills/（explore-kb, maintain-kb, {{PROJECT_SLUG}}-commander；Claude Code 通过 .claude 兼容层读取）
   产品视角边界字段：<N> 个模块（Goal 2 Stage B 已产出并写入 index.yaml.modules[]）
   Postmortem: pass/kb-seed-postmortem.md
   Summary: pass/kb-seed-summary.md
@@ -90,10 +91,10 @@ mkdir -p .think-tank/knowledge-base/pass
 mkdir -p .think-tank/knowledge-base/works
 mkdir -p .think-tank/knowledge-base/develop
 mkdir -p .think-tank/knowledge-base/troubleshooting/incidents
-mkdir -p .claude/skills
+mkdir -p .agents/skills
 ```
 
-**目录约定**：不创建 `.think-tank/commander/` 目录（产品视角边界已内嵌于 `knowledge-base/index.yaml`）；不创建 `knowledge-base/decisions/` 目录（设计权衡通过 `works/` 或 git history 追溯）。
+**目录约定**：不创建 `.think-tank/commander/` 目录（产品视角边界已内嵌于 `knowledge-base/index.yaml`）；不创建 `knowledge-base/decisions/` 目录（设计权衡通过 `works/` 或 git history 追溯）。Skill 统一放在 `.agents/skills/`；`.claude` 兼容层在 Stage 7.4 建立。
 
 ### 6.2 验证 Goal 1 已创建的配置文件
 
@@ -145,8 +146,8 @@ mkdir -p .claude/skills
 主 Agent 直接执行（纯文件复制）：
 
 ```bash
-cp -r .think-tank/indexable-docs-kb-seed/skills/explore-kb .claude/skills/
-cp -r .think-tank/indexable-docs-kb-seed/skills/maintain-kb .claude/skills/
+cp -r .think-tank/indexable-docs-kb-seed/skills/explore-kb .agents/skills/
+cp -r .think-tank/indexable-docs-kb-seed/skills/maintain-kb .agents/skills/
 ```
 
 ### 7.2 复制 knowledge-extract-qa-guide
@@ -158,25 +159,27 @@ cp .think-tank/indexable-docs-kb-seed/knowledge-extract-qa-guide.md \
 
 ### 7.3 迁移 Commander skill（模板化复制）
 
-主 Agent 直接执行（Commander 为必装 skill——种子包内含其模板。模板已去 module_header 化，引用路径指向 `index.yaml.modules[]` 产品边界字段。模板分两层：**模板层**——`{{PROJECT_NAME}}` / `{{PROJECT_SLUG}}` / `{{MODULE_LIST}}` / `{{FLOW_LIST}}` 四个占位符，迁移时必须替换；**示例层**——取自 Redis 8.10.2 的教学示例，文件头标有「示例说明」，迁移时**不需要**改写）：
+主 Agent 直接执行（Commander 为必装 skill——种子包内含其模板。模板已去 module_header 化，引用路径指向 `index.yaml.modules[]` 产品边界字段。模板分两层：**模板层**——`{{PROJECT_NAME}}` / `{{PROJECT_SLUG}}` 两个必替换占位符；旧版模板若还含 `{{MODULE_LIST}}` / `{{FLOW_LIST}}`，也一并替换。**示例层**——取自 Redis 8.10.2 的教学示例，文件头标有「示例说明」，迁移时**不需要**改写）：
 
 **步骤 1：复制 Commander skill 到目标位置**
 
 ```bash
 cp -r .think-tank/indexable-docs-kb-seed/skills/commander \
-      .claude/skills/{{PROJECT_SLUG}}-commander
+      .agents/skills/{{PROJECT_SLUG}}-commander
 ```
 
 **步骤 2：替换模板占位符**
 
-主 Agent 读取 `index.yaml.meta.project_name` 获得 `{{PROJECT_NAME}}`（如 `MyProject`），从 `{{PROJECT_NAME}}` 派生 `{{PROJECT_SLUG}}`（小写化 + 特殊字符替换为连字符，如 `myproject`）；再从 `index.yaml.modules[].id` 逗号连接得到 `{{MODULE_LIST}}`、从 `index.yaml.flows[].id` 逗号连接得到 `{{FLOW_LIST}}`。然后对 `.claude/skills/{{PROJECT_SLUG}}-commander/` 下的所有 `.md` 文件执行字符串替换：
+主 Agent 读取 `index.yaml.meta.project_name` 获得 `{{PROJECT_NAME}}`（如 `MyProject`），从 `{{PROJECT_NAME}}` 派生 `{{PROJECT_SLUG}}`（小写化 + 特殊字符替换为连字符，如 `myproject`）。然后对 `.agents/skills/{{PROJECT_SLUG}}-commander/` 下的所有 `.md` 文件执行字符串替换：
+
+> 当前模板的 `description` 已改为指向 `index.yaml`，不再内联完整 modules/flows 清单。若目标工程使用的是旧版模板且文件中仍含 `{{MODULE_LIST}}` / `{{FLOW_LIST}}`，再从 `index.yaml.modules[].id` / `index.yaml.flows[].id` 生成并替换；不要为了保留清单而把 description 撑到 1024 字符以上。
 
 | 替换 | 源 | 目标 |
 |------|---|------|
 | `{{PROJECT_NAME}}` | 模板层占位符 | `index.yaml.meta.project_name` 的值 |
 | `{{PROJECT_SLUG}}` | 模板层占位符 | 从 project_name 派生的 slug |
-| `{{MODULE_LIST}}` | 模板层占位符 | `index.yaml.modules[].id` 逗号连接 |
-| `{{FLOW_LIST}}` | 模板层占位符 | `index.yaml.flows[].id` 逗号连接 |
+| `{{MODULE_LIST}}` | 旧版模板可选占位符（若存在） | `index.yaml.modules[].id` 逗号连接 |
+| `{{FLOW_LIST}}` | 旧版模板可选占位符（若存在） | `index.yaml.flows[].id` 逗号连接 |
 
 （`{{PROJECT_SLUG}}-commander` 形式的 skill 名由 `{{PROJECT_SLUG}}` 替换一并覆盖，无需单独一行。）
 
@@ -184,7 +187,7 @@ cp -r .think-tank/indexable-docs-kb-seed/skills/commander \
 
 Commander 模板分两层，迁移时只处理模板层，**不逐个重写示例**：
 
-1. **模板层**：确认 4 个占位符已替换完毕——`grep -rc '{{' .claude/skills/{{PROJECT_SLUG}}-commander/` 各文件计数应全为 0
+1. **模板层**：确认所有 `{{...}}` 占位符已替换完毕——`grep -rc '{{' .agents/skills/{{PROJECT_SLUG}}-commander/` 各文件计数应全为 0
 2. **示例层**：确认文件头的「示例说明」存在（`SKILL.md` 与 `references/` 下 5 个文件各 1 行），该行声明示例仅作教学用途、不属于模板变量
 3. **去示例化（仅当人类显式要求）**：可**整目录删除** `references/examples/`（模板未含该目录时，手工删除各文件中的示例小节）。**禁止逐句改写示例内容**——示例已标明是示例，而不是待填模板
 
@@ -194,12 +197,83 @@ Commander 模板分两层，迁移时只处理模板层，**不逐个重写示�
 
 **步骤 5：验证**
 
-- 验证 `.claude/skills/{{PROJECT_SLUG}}-commander/SKILL.md` 存在
-- 验证占位符残留 0：`grep -rc '{{' .claude/skills/{{PROJECT_SLUG}}-commander/` 各文件计数均为 0（`{{PROJECT_NAME}}` / `{{PROJECT_SLUG}}` / `{{MODULE_LIST}}` / `{{FLOW_LIST}}` 全部替换完毕）
-- 验证 SKILL.md description 中 modules / flows 列表已替换为本工程实际模块与流程（不再含示例工程以外的工程名；示例工程名子串允许存在，例如 `Redis`）
+- 验证 `.agents/skills/{{PROJECT_SLUG}}-commander/SKILL.md` 存在
+- 验证占位符残留 0：`grep -rc '{{' .agents/skills/{{PROJECT_SLUG}}-commander/` 各文件计数均为 0（`{{PROJECT_NAME}}` / `{{PROJECT_SLUG}}`，以及旧版模板可能存在的 `{{MODULE_LIST}}` / `{{FLOW_LIST}}` 全部替换完毕）
+- 验证 SKILL.md description 已按本工程替换产品名，且未内联超长 modules/flows 清单（完整清单以 `index.yaml` 为准；示例工程名子串允许存在，例如 `Redis`）
 - 验证各文件头部的「示例说明」行仍在（示例层未被误删或逐句改写）
+- 验证 SKILL.md frontmatter 的 `description` 长度 ≤ 1024 字符（Agent Skills 上限；超限会导致 skill 被直接拒绝加载）。若超限，删除 description 中的内联模块/流程清单，改为「完整清单见 index.yaml 的 modules[] 与 flows[]」，然后重新验证
 
-### 7.4 Skill 说明
+### 7.4 建立 `.claude` 兼容层（Claude Code）
+
+`.agents/skills/` 是 **唯一真实源**。Claude Code 仍从 `.claude/skills/` 发现 skill，因此需要建立兼容软链；**不要复制第二份可编辑副本**。
+
+先检查是否已就绪：`readlink .claude` 或 `readlink .claude/skills`。若已指向 `.agents` / `../.agents/skills`，直接跳过本节。若 `.claude` 本身是软链但目标不是 `.agents`，不要自动改写：Journal 记录 `{action: error, error_type: claude_symlink_conflict, target: <...>}`，提示人类确认后再继续。
+
+按目标工程现状选择（从上到下匹配第一条）：
+
+**情况 A：`.claude` 不存在**
+
+```bash
+ln -s .agents .claude
+```
+
+**情况 B：`.claude` 存在，但只有 skills（或为空目录）**
+
+先确认 `.claude/skills` 内没有 `.agents/skills` 之外的自定义 skill。若有，先合并到 `.agents/skills/`，禁止直接删除。合并完成后：
+
+```bash
+# 若 .claude 是空目录
+rmdir .claude
+ln -s .agents .claude
+
+# 若 .claude/skills 已存在且内容已合并到 .agents/skills，保留备份后替换为软链
+mv .claude/skills .claude/skills.bak-<timestamp>
+ln -s ../.agents/skills .claude/skills
+```
+
+**情况 C：`.claude` 含 `settings.json` / `agents/` / `commands/` / `hooks/` 等其他内容**
+
+保留 `.claude` 目录，只建立 `.claude/skills` 软链：
+
+```bash
+# 若 .claude/skills 不存在
+ln -s ../.agents/skills .claude/skills
+
+# 若 .claude/skills 已存在且含自定义 skill：先合并到 .agents/skills/，再替换
+# 无法安全合并时，保留原目录，逐个软链本 KB 的三个 skill：
+mkdir -p .claude/skills
+ln -s ../../.agents/skills/explore-kb .claude/skills/explore-kb
+ln -s ../../.agents/skills/maintain-kb .claude/skills/maintain-kb
+ln -s ../../.agents/skills/{{PROJECT_SLUG}}-commander .claude/skills/{{PROJECT_SLUG}}-commander
+```
+
+同名目录已存在时，先 `mv` 到 `.bak-<timestamp>`，不要删除。
+
+**情况 D：Windows / 环境不支持软链**
+
+```bash
+cp -r .agents/skills .claude/skills
+```
+
+Journal 追加 `{action: decision, decision: claude_skills_copied, reason: symlink_unavailable}`，并在 `pass/kb-seed-postmortem.md` 记录：`.claude/skills` 是副本，后续以 `.agents/skills/` 为准。
+
+**其他 Agent**：若目标 Agent 的 skill 发现路径是 `.codex/skills`（部分 Codex 版本），按同样原则建立 `.codex/skills -> ../.agents/skills` 软链；`.agents/skills/` 仍是唯一真实源，不要为每个 Agent 复制一份。
+
+**验证**：
+
+```bash
+readlink .claude || readlink .claude/skills
+test -f .claude/skills/explore-kb/SKILL.md
+test -f .claude/skills/maintain-kb/SKILL.md
+test -f .claude/skills/{{PROJECT_SLUG}}-commander/SKILL.md
+```
+
+**禁止**：
+- 禁止 `rm -rf .claude` 覆盖未知配置；
+- 禁止在 `.claude/skills` 维护第二份可编辑副本；
+- 禁止在 `.claude` 已存在其他配置时把整个 `.claude` 替换成软链。
+
+### 7.5 Skill 说明
 
 **explore-kb**：知识库探索检索。用户调用 `/explore-kb <question>` 时激活，通过 `index.yaml` 三级降级检索。已去耦合（零产品名引用）。
 
@@ -216,9 +290,11 @@ Commander 模板分两层，迁移时只处理模板层，**不逐个重写示�
 | **产出** | `pass/{doc_id}.qa.jsonl` → `pass/kb-build-qa.md` | 各层 `qa.md`（Markdown） |
 | **回答者** | 人类开发者（代码歧义） | 人类团队（隐性知识） |
 
-### 7.5 Stage 7 收尾
+### 7.6 Stage 7 收尾
 
-- 验证 explore-kb / maintain-kb / commander 三个 skill 均已就位
+- 验证 `.agents/skills/` 下 explore-kb / maintain-kb / commander 三个 skill 均已就位
+- 验证 `.claude` 兼容层存在（软链；或 fallback 副本并在 postmortem 记录）
+- 验证每个 `SKILL.md` 的 `description` 长度 ≤ 1024 字符
 - 验证 knowledge-extract-qa-guide 已迁移
 - 更新 Progress Log：`Stage 7: ✅`
 
@@ -242,10 +318,11 @@ Commander 模板分两层，迁移时只处理模板层，**不逐个重写示�
 [ ] .think-tank/knowledge-base/works/.meta-work-guide.md
 [ ] .think-tank/knowledge-base/troubleshooting/runbooks/.meta-runbook-guide.md
 [ ] .think-tank/knowledge-base/troubleshooting/incidents/.meta-incident-guide.md
-[ ] .claude/skills/explore-kb/SKILL.md
-[ ] .claude/skills/maintain-kb/SKILL.md
-[ ] .claude/skills/{{PROJECT_SLUG}}-commander/SKILL.md（必装）
-[ ] .claude/skills/{{PROJECT_SLUG}}-commander/references/{workflow,answer-strategy,routing-rules,context-budget,knowledge-writeback}.md
+[ ] .agents/skills/explore-kb/SKILL.md
+[ ] .agents/skills/maintain-kb/SKILL.md
+[ ] .agents/skills/{{PROJECT_SLUG}}-commander/SKILL.md（必装）
+[ ] .agents/skills/{{PROJECT_SLUG}}-commander/references/{workflow,answer-strategy,routing-rules,context-budget,knowledge-writeback}.md
+[ ] .claude 兼容层：.claude 或 .claude/skills 指向 .agents（不支持软链时为副本并在 postmortem 记录）
 ```
 
 **必选目录**：
@@ -259,12 +336,15 @@ Commander 模板分两层，迁移时只处理模板层，**不逐个重写示�
 [ ] .think-tank/knowledge-base/architecture/
 [ ] .think-tank/knowledge-base/modules/
 [ ] .think-tank/knowledge-base/flows/
+[ ] .agents/skills/
 ```
 
 **内容一致性检查**：
 - `index.yaml.meta.excluded_paths` 存在（即使为空数组也需存在）
 - `modules[].covers_code` 中的所有路径都不落在 `excluded_paths` 下
 - **产品字段覆盖**：`index.yaml.modules[]` 中含 `responsibility` 字段的条目 ≥ 全部 modules 数量的 50%（Goal 1 Stage B 应已上浮大部分模块的产品视角字段。少于 50% 说明 Stage B 有质量问题，记入 postmortem 但不阻塞 Goal 完成）
+- **Skill 可达性**：`.agents/skills/` 中的三个 skill 均能被目标 Agent 发现；Claude Code 通过 `.claude` 兼容层读取同一份文件
+- **Skill description 长度**：所有 `SKILL.md` 的 `description` ≤ 1024 字符（Agent Skills 上限）
 
 ### 8.2 生成 postmortem（分派 1 个 sub-agent）
 

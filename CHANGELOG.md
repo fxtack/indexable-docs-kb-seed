@@ -5,6 +5,28 @@
 >
 > **版本线说明**：正文与代码注释中出现的 `v1.x` / `v2.0.x` 是种子包并入本仓库**之前**的结构演进编号（用于解释设计沿革，例如「产品视角字段内嵌于 `index.yaml.modules[]`」是在那一代引入的），**不属于本仓库版本线**。本仓库版本以 `VERSION` 文件与 git tag 为准。
 
+## 0.2.3 — 2026-10-23
+
+### 问题
+Skill 迁移目标硬编码为 `.claude/skills/`，只有 Claude Code 能发现；pi / OpenCode 等 Agent 读不到同一份 skill。部分工程已把 skill 放到 `.agents/skills/` 并用 `.claude` 软链兼容，但种子包没有把这套做法固化，导致每次构建都要人工改路径。
+
+### 变更
+- **Goal 3 Stage 7 的 skill 目标目录改为 `.agents/skills/`**：Agent Skills 中立位置，pi / OpenCode 可直接发现；Claude Code 通过兼容层读取同一份文件。
+- **新增 `.claude` 兼容层步骤**：`.claude` 不存在时整目录软链到 `.agents`；`.claude` 已存在时只建立 `.claude/skills -> ../.agents/skills`，保留 `.claude` 下的其他配置；不支持软链的环境允许复制 fallback，并记录 `claude_skills_copied` 与漂移风险。
+- 同步更新 Goal 3 / Goal 4 / `maintain-kb` / 两份 README / `DESIGN-planning.md` 中所有 `.claude/skills` 引用。
+- 若目标 Agent 只认 `.codex/skills`（部分 Codex 版本），可按同样原则建立 `.codex/skills -> ../.agents/skills` 兼容软链；`.agents/skills/` 仍是唯一真实源。
+- **Commander 模板的 `description` 不再内联 modules/flows 清单**：改为「完整清单见 `index.yaml` 的 `modules[]` 与 `flows[]`」，避免占位符展开后超过 1024 字符；`{{MODULE_LIST}}` / `{{FLOW_LIST}}` 仅在旧版模板中作为可选替换项保留。
+- **Stage 7 增加 `description` 长度校验**：所有 `SKILL.md` 的 `description` 必须 ≤ 1024 字符（Agent Skills 上限）。DeepInfer 实跑发现 commander 的 description 因占位符展开到 1120 字符，会被客户端直接拒绝加载。
+- README 前置条件从「Claude Code 环境」放宽为「支持 `/goal` 的 Agent 环境（如 Claude Code、pi）」。
+
+### 兼容性
+- 新建 KB 默认使用 `.agents/skills/`；旧 KB 的 `.claude/skills/` 布局仍可通过 `.claude` 软链或手动迁移继续使用。
+- 任务文档中的路径变化只影响 Goal 3 的迁移目标，不改变已生成 KB 的内容、`index.yaml` 结构或 QA 协议。
+
+### 影响
+- pi / OpenCode 可直接发现 skill；Claude Code 通过软链读取同一份文件，不再维护第二份可编辑副本。
+- 已有 `.claude` 配置的工程不会被覆盖；只有在 `.claude` 不存在或为空时才使用整目录软链。
+
 ## 0.2.2 — 2026-10-21
 
 ### 问题

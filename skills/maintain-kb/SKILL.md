@@ -42,7 +42,7 @@ user-invocable: true
    - 检查 `depends_on` / `involves_modules` / `refs` 字段分别是否存在于索引条目中 → **传递展开可用字段**。存在的用于二级展开，不存在的静默跳过
 
 3. 检查文件系统：
-   - `.claude/skills/explore-kb/SKILL.md` 是否存在 → **peer skill 可用性**。若不存在，JSONL 信箱协作机制不可用
+   - `.agents/skills/explore-kb/SKILL.md` 是否存在 → **peer skill 可用性**。若不存在，JSONL 信箱协作机制不可用（旧布局可回退检查 `.claude/skills/explore-kb/SKILL.md`）
    - `.think-tank/knowledge-base/.meta-explore-issues.jsonl` 是否存在 → **JSONL 信箱可用性**（需 peer skill 可用为前提）
 
 4. 输出自发现摘要，示例格式：

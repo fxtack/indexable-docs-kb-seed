@@ -1,6 +1,6 @@
 ---
 name: "{{PROJECT_SLUG}}-commander"
-description: Use this skill whenever the user asks anything about the {{PROJECT_NAME}} product — its architecture, modules, request flow, deployment, debugging, design decisions, or any cross-module behavior. Activate it for tasks like "如何排查 Redis xxx 问题"、"Redis 的 xxx 是怎么实现的"、"评估 Redis xxx 设计"、"在 Redis 中新增 xxx 能力"、任何涉及跨模块推理的问题。This skill enforces the mandatory knowledge-base-first routing protocol so the agent does not blindly grep code or hallucinate cross-module behavior. 覆盖 modules（{{MODULE_LIST}}）与 flows（{{FLOW_LIST}}）。示例：modules（object-model / replication / cluster / rdb-persistence / …）、flows（command-execution-flow / replication-sync-flow / …）。
+description: Use this skill whenever the user asks anything about the {{PROJECT_NAME}} product — its architecture, modules, request flow, deployment, debugging, design decisions, or any cross-module behavior. Activate it for tasks like "排查某个模块的问题"、"某个机制是怎么实现的"、"评估某个设计"、"新增某项能力"、任何涉及跨模块推理的问题。This skill enforces the mandatory knowledge-base-first routing protocol so the agent does not blindly grep code or hallucinate cross-module behavior. 覆盖本工程的 modules 与 flows；完整清单见 .think-tank/knowledge-base/index.yaml 的 modules[] 与 flows[]。
 ---
 
 # {{PROJECT_SLUG}}-commander

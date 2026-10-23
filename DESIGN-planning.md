@@ -534,35 +534,32 @@ Stage 5: QA 聚合
 
 ---
 
-## 5. Goal 3: kb-infra-setup（基础设施 + Skill + Commander 内容构建）
+## 5. Goal 3: kb-infra-setup（基础设施 + Skill 迁移）
 
 ### 5.1 定位
 
-Goal 3 在 `kb-docs-bake` 完成之后执行。此时 KB 文档内容已经生成、Review 收敛、QA 已聚合。但 KB 的**运行基础设施**尚未就绪——Skill 没有安装、目录不完整、没有 README 作为入口文档、维护信标和 explore-issues 等基础设施文件也缺失、Commander 决策中枢的 module_header 内容也未构建。
+Goal 3 在 `kb-docs-bake` 完成之后执行。此时 KB 文档内容已经生成、Review 收敛、QA 已聚合。但 KB 的**运行基础设施**尚未就绪——Skill 没有安装、目录不完整、没有 README 作为入口文档、维护信标和 explore-issues 等基础设施文件也缺失。
 
-Goal 3 的任务大部分是**文件系统操作**（复制、创建、写入），主 Agent 可自主完成。仅少数需要判断或语义提炼的任务需要分派 sub-agent（KB README 编写、Commander 内容构建的 module_header 上浮、Commander README 编写、postmortem 汇总）。
+Goal 3 的任务大部分是**文件系统操作**（复制、创建、写入），主 Agent 可自主完成。仅少数需要判断或语义提炼的任务需要分派 sub-agent（KB README 编写、postmortem 汇总）。
+
+v2.0 起，产品视角边界字段已由 Goal 1 Stage B 直接写入 `index.yaml.modules[]`，不再有独立的 Commander module_header 内容构建 Stage；Commander skill 只迁移协议层（`SKILL.md` + `references/`）。
 
 ### 5.2 Goal 3 的 Stage 设计
 
 ```
 Stage 6: 目录与基础设施文件创建
-  └── 创建 pass/、works/、develop/、troubleshooting/incidents/、commander/history/decisions/
+  └── 创建 pass/、works/、develop/、troubleshooting/incidents/、.agents/skills/
   └── 验证 .meta-maintain-beacon.yaml、.meta-explore-issues.jsonl（Goal 1 已产出）
   └── 生成 KB README（1 个 sub-agent）
 
 Stage 7: Skill 迁移
-  └── 复制 explore-kb / maintain-kb skill（去耦合版）
+  └── 复制 explore-kb / maintain-kb skill 到 .agents/skills/
   └── 复制 knowledge-extract-qa-guide.md
-  └── 边复制边模板化，将 commander skill 安装为 {{PROJECT_SLUG}}-commander
+  └── 边复制边模板化，将 commander skill 安装为 .agents/skills/{{PROJECT_SLUG}}-commander/
+  └── 建立 .claude 兼容层（.claude 或 .claude/skills 指向 .agents）
 
-Stage 8: Commander 内容构建（本 Goal 的核心新增能力）
-  └── 复制 commander 元文档（module_header_meta.md / TEMPLATE.md / decisions/index.yaml）
-  └── **module_header 上浮**：为 modules/ 中的每个模块，分派 sub-agent 从技术视角文档上浮生成产品视角的 module_header_<Name>.md
-  └── 生成 Commander README（1 个 sub-agent，含目录速览表 + 模块通讯关系图 + 核心流程时序图 + 盲区清单）
-
-Stage 9: 完整性检查 + 收尾
+Stage 8: 完整性检查 + 收尾
   └── 对照清单逐项验证所有必选文件与目录
-  └── 检查 module_header 覆盖率（阈值：≤ 10% 缺失允许）
   └── 生成 postmortem + summary
 ```
 
@@ -580,6 +577,7 @@ Stage 9: 完整性检查 + 收尾
 | 创建目录 | `works/` | 如不存在。用于存放 Work 文档。需包含 `.meta-work-guide.md`（已在 Goal 1 中生成） |
 | 创建目录 | `develop/` | 如不存在。用于存放研发规范文档（初始为空，后续按需创建） |
 | 创建目录 | `troubleshooting/incidents/` | 如不存在 |
+| 创建目录 | `.agents/skills/` | Skill 安装目录；Claude Code 兼容层在 Stage 7 建立 |
 | 验证配置文件 | `.meta-maintain-beacon.yaml` | 验证存在（通常已在 Goal 1 Stage B 中创建）。若丢失则重新创建，commit = HEAD |
 | 验证配置文件 | `.meta-explore-issues.jsonl` | 验证存在（通常已在 Goal 1 Stage B 中创建）。若丢失则重建空文件 |
 | 创建入口文档 | `README.md` | **需分派 sub-agent** 编写 |
@@ -620,14 +618,23 @@ Sub-agent 任务：
 
 | 源（种子包中） | 目标 | 操作 | 说明 |
 |---------------|------|------|------|
-| `skills/explore-kb/` | `.claude/skills/explore-kb/` | 复制目录 | 已去耦合，零产品名引用 |
-| `skills/maintain-kb/` | `.claude/skills/maintain-kb/` | 复制目录 | 已去耦合，通过 index.yaml 自发现环境 |
-| `skills/commander/` | `.claude/skills/{{PROJECT_SLUG}}-commander/` | 边复制边模板化 | 6 份文件（SKILL.md + 5 references），替换 `{{PROJECT_NAME}}` / `{{PROJECT_SLUG}}` 等占位符；`{ADAPT}` 标记保留 |
+| `skills/explore-kb/` | `.agents/skills/explore-kb/` | 复制目录 | 已去耦合，零产品名引用 |
+| `skills/maintain-kb/` | `.agents/skills/maintain-kb/` | 复制目录 | 已去耦合，通过 index.yaml 自发现环境 |
+| `skills/commander/` | `.agents/skills/{{PROJECT_SLUG}}-commander/` | 边复制边模板化 | 6 份文件（SKILL.md + 5 references），替换 `{{PROJECT_NAME}}` / `{{PROJECT_SLUG}}` 等占位符；`{ADAPT}` 标记保留 |
 | `knowledge-extract-qa-guide.md` | `.think-tank/knowledge-base/knowledge-extract-qa-guide.md` | 复制文件 | 通用文档，直接可用 |
+
+**为什么用 `.agents/skills/` 作为唯一目标**：
+
+- `.agents/skills/` 是 Agent Skills 的中立位置——pi 与 OpenCode 都从这里发现 skill；Claude Code 从 `.claude/skills/` 发现。
+- 不复制两份：`.agents/skills/` 是唯一真实源，`.claude` 只做兼容层。
+- 软链策略：`.claude` 不存在时整目录软链到 `.agents`；`.claude` 已存在时只建立 `.claude/skills -> ../.agents/skills`，避免覆盖 `.claude/settings.json` / `agents/` / `commands/` / `hooks/` 等其他配置。
+- 不支持软链的环境允许复制 fallback，但必须在 Journal 记录 `claude_skills_copied`，并在 postmortem 说明 `.agents/skills/` 是权威源、`.claude/skills` 只是副本。
+- 若 Codex 版本只认 `.codex/skills`，可建立 `.codex/skills -> ../.agents/skills` 兼容软链；`.agents/skills/` 仍是唯一真实源。
+- `description` 必须 ≤ 1024 字符（Agent Skills 上限）；超限会被客户端直接拒绝加载。
 
 **关于 Commander skill**：
 - Commander skill 本身是**协议**，负责回答策略、路由规则、上下文预算、知识回写等运行时行为。协议部分是通用的，通过模板化后即可迁移到任意工程；
-- Commander 依赖 `.think-tank/commander/` 目录下的 module_header 体系作为**内容**——这部分内容由 Stage 8 从 `knowledge-base/modules/` 上浮生成；
+- Commander 依赖 `index.yaml.modules[]` 中已内嵌的产品视角边界字段（`responsibility` / `capability_boundary` / `communicates_with`）。这些字段由 Goal 1 Stage B 直接产出，v2.0 起不再有独立的 `.think-tank/commander/` module_header 体系；
 - Skill 命名规则：`{{PROJECT_SLUG}}-commander`。`{{PROJECT_SLUG}}` 从 `project_name` 派生（小写化 + 特殊字符替换为连字符），即 `{{PROJECT_NAME}} → {{PROJECT_SLUG}}`（例：`Redis` → `redis`，对应 skill 名 `redis-commander`）；
 - 迁移完成后，用户可通过 `/{{PROJECT_SLUG}}-commander` 或自然语言触发（skill description 中含产品名与主要模块名）激活。
 
@@ -707,45 +714,38 @@ Sub-agent 任务：
   [ ] .think-tank/knowledge-base/troubleshooting/runbooks/.meta-runbook-guide.md
   [ ] .think-tank/knowledge-base/troubleshooting/incidents/.meta-incident-guide.md
   [ ] .think-tank/knowledge-base/troubleshooting/.meta-ts-output-template.md（如有）
-  [ ] .think-tank/commander/module_header_meta.md
-  [ ] .think-tank/commander/README.md
-  [ ] .think-tank/commander/history/decisions/TEMPLATE.md
-  [ ] .think-tank/commander/history/decisions/index.yaml
-  [ ] .claude/skills/explore-kb/SKILL.md
-  [ ] .claude/skills/maintain-kb/SKILL.md
-  [ ] .claude/skills/{{PROJECT_SLUG}}-commander/SKILL.md
-  [ ] .claude/skills/{{PROJECT_SLUG}}-commander/references/{workflow,answer-strategy,routing-rules,context-budget,knowledge-writeback}.md
-
-module_header 覆盖率：
-  [ ] modules/ 中每个模块对应 module_header_<Name>.md 存在（阈值 ≥ 90%）
+  [ ] .agents/skills/explore-kb/SKILL.md
+  [ ] .agents/skills/maintain-kb/SKILL.md
+  [ ] .agents/skills/{{PROJECT_SLUG}}-commander/SKILL.md
+  [ ] .agents/skills/{{PROJECT_SLUG}}-commander/references/{workflow,answer-strategy,routing-rules,context-budget,knowledge-writeback}.md
+  [ ] .claude 兼容层：.claude 或 .claude/skills 指向 .agents（不支持软链时为副本并在 postmortem 记录）
 
 目录项：
   [ ] pass/ 存在
   [ ] works/ 存在
   [ ] develop/ 存在
   [ ] troubleshooting/incidents/ 存在
-  [ ] commander/history/decisions/ 存在
 
 收尾：
   [ ] pass/kb-seed-postmortem.md 已生成（聚合三个 Goal 的异常信号和统计）
   [ ] pass/kb-seed-summary.md 已生成（人类可读的构建完成证书）
 ```
 
-**postmortem 生成**（由主 Agent 或分派一个 sub-agent）：读取三个 Journal 文件，聚合异常信号。包含：各 Goal 耗时、异常统计、重试率、最常见错误类型、关键决策记录（含 module_header 上浮失败项）、流程优化建议。
+**postmortem 生成**（由主 Agent 或分派一个 sub-agent）：读取三个 Journal 文件，聚合异常信号。包含：各 Goal 耗时、异常统计、重试率、最常见错误类型、关键决策记录、流程优化建议。
 
-**summary 生成**（由主 Agent）：一页纸的构建完成摘要。包含：三个 Goal 完成状态、总耗时、文档数量（A/F/M/T）、QA 问题统计、Commander module_header 覆盖率、关键决策、下一步行动。
+**summary 生成**（由主 Agent）：一页纸的构建完成摘要。包含：三个 Goal 完成状态、总耗时、文档数量（A/F/M/T）、QA 问题统计、Skill 安装位置与 `.claude` 兼容层状态、关键决策、下一步行动。
 
 **Goal 3 完成条件**：
 - 所有必选项文件存在
-- 所有目录项存在（含 develop/、commander/history/decisions/）
+- 所有目录项存在（含 `develop/`、`.agents/skills/`）
 - KB README 已生成
-- explore-kb / maintain-kb / {{PROJECT_SLUG}}-commander 三个 skill 已安装
+- explore-kb / maintain-kb / {{PROJECT_SLUG}}-commander 三个 skill 已安装到 `.agents/skills/`
+- `.claude` 兼容层已建立（软链；或 fallback 副本并在 postmortem 记录）
+- 所有 `SKILL.md` 的 `description` ≤ 1024 字符
 - knowledge-extract-qa-guide.md 已移植
-- Commander 元文档（module_header_meta.md / README.md / decisions TEMPLATE + index）齐备
-- module_header 覆盖率 ≥ 90%
 - `pass/kb-seed-postmortem.md` 已生成
 - `pass/kb-seed-summary.md` 已生成
-- Agent 输出：`GOAL_MET: kb-infra-setup 完成。基础设施就绪，Skill 已安装（含 {{PROJECT_SLUG}}-commander），module_header 覆盖 N/M。Postmortem 和 Summary 已生成。`
+- Agent 输出：`GOAL_MET: kb-infra-setup 完成。基础设施就绪，Skill 已安装到 .agents/skills/（含 {{PROJECT_SLUG}}-commander）。Postmortem 和 Summary 已生成。`
 
 ---
 
@@ -755,7 +755,7 @@ module_header 覆盖率：
 
 Goal 4 是**可选**的，在 Goal 3 完成后执行。
 
-**核心动机**：Goal 2 Stage 4 Review 阶段产出的 kb-build-qa.md 是**局部视角**的产物——每个 Review sub-agent 只看到自己负责的一份文档 + 对应 covers_code，无法从全局 KB 视角判断"这个问题是否其实已经能被 KB 回答"。等到 Goal 3 结束、KB 完整互联（含 module_header / flows / troubleshooting / knowledge-base-guide），实际上很多局部视角提出的问题此时已经能被 KB 回答；剩下的才是真正需要人类介入的隐性知识。
+**核心动机**：Goal 2 Stage 4 Review 阶段产出的 kb-build-qa.md 是**局部视角**的产物——每个 Review sub-agent 只看到自己负责的一份文档 + 对应 covers_code，无法从全局 KB 视角判断"这个问题是否其实已经能被 KB 回答"。等到 Goal 3 结束、KB 完整互联（含 `index.yaml.modules[]` 产品视角字段 / flows / troubleshooting / knowledge-base-guide），实际上很多局部视角提出的问题此时已经能被 KB 回答；剩下的才是真正需要人类介入的隐性知识。
 
 Goal 4 就是补上这个"全局视角回答尝试"环节。用 explore-kb 尝试回答每个 QA 问题，把结果分为 4 档：
 
@@ -1338,9 +1338,9 @@ v6 起明确职责分离，消除 v5 版本中两者维护重叠的问题：
 | `prompts/stage-3-subagent.md` | Prompt 模板 | Goal 2 Stage 3 文档生成 sub-agent prompt |
 | `prompts/stage-4-subagent.md` | Prompt 模板 | Goal 2 Stage 4 Review sub-agent prompt |
 | `prompts/stage-5-aggregation.md` | Prompt 模板 | Goal 2 Stage 5 QA 聚合指令 |
-| `skills/explore-kb/` | Skill | 已去耦合，直接复制。Goal 3 Stage 7 中迁移 |
-| `skills/maintain-kb/` | Skill | 已去耦合，直接复制。Goal 3 Stage 7 中迁移 |
-| `skills/commander/` | Skill（模板化） | v1.1 新增。含 SKILL.md + 5 references。文件中使用 `{{PROJECT_NAME}}` / `{{PROJECT_SLUG}}` / `{{MODULE_LIST_INLINE}}` 等占位符。Goal 3 Stage 7 迁移时边复制边替换占位符（`{ADAPT}` 标记保留） |
+| `skills/explore-kb/` | Skill | 已去耦合，直接复制。Goal 3 Stage 7 迁移到 `.agents/skills/explore-kb/` |
+| `skills/maintain-kb/` | Skill | 已去耦合，直接复制。Goal 3 Stage 7 迁移到 `.agents/skills/maintain-kb/` |
+| `skills/commander/` | Skill（模板化） | v1.1 新增。含 SKILL.md + 5 references。模板层使用 `{{PROJECT_NAME}}` / `{{PROJECT_SLUG}}` 占位符；模块/流程清单从 `index.yaml` 运行时读取，不内联到 description。Goal 3 Stage 7 迁移到 `.agents/skills/{{PROJECT_SLUG}}-commander/`，边复制边替换占位符（`{ADAPT}` 标记保留） |
 | `qa-triage.md` | Goal 4 任务文档 | 全局 QA 分诊：把 `kb-build-qa.md` 重组为 4 档 verdict + 产出 `kb-doc-patches.md`。默认执行 |
 | `templates/kb-readme.md.template` | 元文档模板 | 含 `{ADAPT}` 标记。Goal 3 Stage 6 用于生成 KB 根 `README.md` |
 | `knowledge-extract-qa-guide.md` | 关键元文档 | 通用文档，定义 QA 提取工作流（内嵌格式规范，替代 qa-template.md）。Goal 3 中迁移 |

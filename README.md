@@ -25,7 +25,7 @@ The pack name deliberately does not bind to any dimension set, so that this kind
 
 - The target project is a git repository root (contains `.git`)
 - The target project has no knowledge base yet (`.think-tank/knowledge-base/index.yaml` does not exist)
-- A Claude Code environment that supports `/goal`-driven multi-agent orchestration
+- An agent environment that supports `/goal`-driven multi-agent orchestration (e.g. Claude Code, pi)
 - Sufficient API quota (a medium-sized project is estimated at 10–15M tokens)
 
 ### Four steps (plus a meta step)
@@ -42,7 +42,7 @@ cp -r indexable-docs-kb-seed /path/to/target-project/.think-tank/
 
 # 2. Enter the target project and start Goal 1
 cd /path/to/target-project
-# In Claude Code: /goal .think-tank/indexable-docs-kb-seed/primer.md
+# In your agent (Claude Code / pi): /goal .think-tank/indexable-docs-kb-seed/primer.md
 
 # 3. When Goal 1 finishes it produces an instantiated Goal 2 task document.
 #    A human reviews the document list and the "estimated cost" section,
@@ -78,16 +78,18 @@ cd /path/to/target-project
 | `templates/meta-runbook-guide.md` | Generic template | Usable as-is |
 | `templates/meta-incident-guide.md` | Generic template | Usable as-is |
 | `templates/kb-readme.md.template` | KB README template | Used by Goal 3 Stage 6 to generate the KB root README |
-| `skills/explore-kb/` | Skill | Decoupled; migrated to `.claude/skills/` in Goal 3 Stage 7 |
-| `skills/maintain-kb/` | Skill | Decoupled; migrated to `.claude/skills/` in Goal 3 Stage 7 |
-| `skills/commander/` | Skill | Templated. **Template layer** holds only `{{PROJECT_NAME}}` / `{{PROJECT_SLUG}}` / `{{MODULE_LIST}}` / `{{FLOW_LIST}}`; **example layer** comes from Redis 8.10.2 (a public project). Migrated to `.claude/skills/{{PROJECT_SLUG}}-commander/` in Goal 3 Stage 7 |
+| `skills/explore-kb/` | Skill | Decoupled; migrated to `.agents/skills/` in Goal 3 Stage 7 (Claude Code reads it through the `.claude` compatibility link) |
+| `skills/maintain-kb/` | Skill | Decoupled; migrated to `.agents/skills/` in Goal 3 Stage 7 |
+| `skills/commander/` | Skill | Templated. **Template layer** holds only `{{PROJECT_NAME}}` / `{{PROJECT_SLUG}}`; the module/flow list is read from `index.yaml` at runtime instead of being inlined into the skill description. **Example layer** comes from Redis 8.10.2 (a public project). Migrated to `.agents/skills/{{PROJECT_SLUG}}-commander/` in Goal 3 Stage 7 |
 | `knowledge-extract-qa-guide.md` | Key meta document | Migrated to the KB root by Goal 3; defines the QA extraction workflow |
+
+> **Skill location**: Goal 3 installs skills under `.agents/skills/` (the cross-agent location used by pi and OpenCode). For Claude Code it creates a `.claude` compatibility link — a whole-directory link when `.claude` is absent, otherwise only `.claude/skills -> ../.agents/skills` so existing Claude config is preserved. It never keeps a second editable copy.
 
 > **Retired files**: `templates/commander/` and `prompts/stage-commander-header-gen.md` are no longer part of this pack — product-boundary fields are produced directly by Goal 1 Stage B and written into `index.yaml.modules[]`, so a standalone `module_header` file system is no longer needed.
 
 ## Example layer vs. template layer
 
-- **Template layer**: placeholders only (`{{PROJECT_NAME}}` / `{{PROJECT_SLUG}}` / `{{MODULE_LIST}}` / `{{FLOW_LIST}}`), replaced with the target project's values during migration.
+- **Template layer**: placeholders only (`{{PROJECT_NAME}}` / `{{PROJECT_SLUG}}`), replaced with the target project's values during migration. The module/flow list is read from `index.yaml` at runtime rather than inlined into the description.
 - **Example layer**: concrete commands, module ids, and mechanism notes taken from Redis 8.10.2 (a public project). Teaching material only — it can be replaced wholesale or deleted.
 - The two layers must not be mixed: the template layer never hard-codes a specific project's commands or ids, and the example layer never masquerades as content that must be kept.
 
