@@ -156,7 +156,7 @@ properties:
   # ─── stage 4 review ──────────────────────────────────
   review_docs:
     type: array
-    description: "Stage 4 每轮需 Review 的全部文档 id（= architecture_docs + module_docs + flow_docs 的所有 id）"
+    description: "Round 1 全量 Review 的文档 id（= architecture_docs + module_docs + flow_docs 的所有 id）；Round 2+ 只复查 coverage 中的文档"
     items: { type: string }
     minItems: 1
 
@@ -164,11 +164,18 @@ properties:
     type: integer
     minimum: 1
     maximum: 10
-    description: "small: 2 / medium: 5 / large: 5"
+    description: "全局安全上限。small: 2 / medium: 5 / large: 5；Round 2+ 只做定向复查"
+
+  targeted_rounds_per_doc:
+    type: integer
+    minimum: 1
+    maximum: 10
+    default: 3
+    description: "单文档在一个未收敛周期内最多被定向 review 的次数；达到后 escalated，交人类决策"
 
   convergence_criteria:
     type: object
-    required: [critical_max, medium_max]
+    required: [critical_max, medium_max, require_next_coverage_empty]
     properties:
       critical_max:
         type: integer
@@ -178,7 +185,47 @@ properties:
       medium_max:
         type: integer
         minimum: 0
-        description: "small: 2 / medium: 4 / large: 4"
+        const: 0
+        description: "文档缺陷 medium 必须为 0；不再使用 medium < 4"
+      require_next_coverage_empty:
+        type: boolean
+        const: true
+        description: "硬收敛必须满足 next_coverage 为空"
+
+  coverage_policy:
+    type: object
+    properties:
+      mode:
+        type: string
+        const: full_then_targeted
+      substantive_change_always_review:
+        type: boolean
+        default: true
+      minor_only_blocks:
+        type: boolean
+        const: false
+      cross_doc_check:
+        type: boolean
+        default: true
+
+  ledger:
+    type: object
+    properties:
+      template:
+        type: string
+        default: ".think-tank/indexable-docs-kb-seed/templates/kb-review-ledger.md.template"
+      path:
+        type: string
+        default: ".think-tank/knowledge-base/pass/kb-review-ledger.md"
+      baseline_manifest:
+        type: string
+        default: ".think-tank/knowledge-base/pass/.review-baseline.tsv"
+      index_backup:
+        type: string
+        default: ".think-tank/knowledge-base/pass/.review-index-before-round-1.yaml"
+      retired_phrases:
+        type: string
+        default: ".think-tank/knowledge-base/pass/.review-retired-phrases.txt"
 
   # ─── build findings ────────────────────────────────
   build_findings:

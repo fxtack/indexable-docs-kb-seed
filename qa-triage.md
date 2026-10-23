@@ -89,6 +89,7 @@ GOAL_ABANDONED: {原因}
 - 验证 `.agents/skills/explore-kb/SKILL.md` 存在（Goal 3 Stage 7 迁移；Claude Code 通过 `.claude` 兼容层读取同一份文件）。若不存在但 `.claude/skills/explore-kb/SKILL.md` 存在，进入兼容模式：Journal 记录 `{action: decision, decision: legacy_skill_layout}`，继续执行
 - 验证 `.agents/skills/{{PROJECT_SLUG}}-commander/SKILL.md` 存在（可选，若装了 commander 可辅助分诊；旧布局可回退检查 `.claude/skills/{{PROJECT_SLUG}}-commander/SKILL.md`）
 - 验证 `.think-tank/knowledge-base/pass/build-findings/discovered-issues.jsonl` 存在。若不存在（旧构建或 Goal 2 遗漏），创建空文件并 Journal 记录 `{action: decision, decision: build_findings_missing}`
+- 验证 `.think-tank/knowledge-base/pass/kb-review-ledger.md` 存在（Goal 2 Stage 4 产出）；若缺失，Journal 记录 `{action: error, error_type: review_ledger_missing}`，Goal 4 可继续但需提示人类
 - 验证 `.think-tank/indexable-docs-kb-seed/verify-build-findings.md` 存在。若缺失，Journal 记录 `{action: error, error_type: verify_task_missing}`；Stage 12.3 跳过复制并在报告中说明
 - 读取 `.think-tank/indexable-docs-kb-seed/VERSION` 获得 `seed_pack_version`
 
@@ -112,7 +113,8 @@ cp .think-tank/knowledge-base/pass/kb-build-qa.md \
 主 Agent 直接执行（不需 sub-agent）：
 
 - 读 `pass/kb-build-qa.md`
-- 解析 Critical / Medium / Minor 三个章节下的所有 QA 条目
+- **本报告只含 `knowledge_gap`**：文档缺陷已在 Goal 2 Stage 4 修复；`Resolved Document Defects` 摘要和 `Quality Warning` 未关闭缺陷不进入分诊队列
+- 解析 Critical / Medium / Minor 三个章节下的所有 knowledge_gap 条目
 - 为每个条目分配唯一 `entry_id`（若原文档已有则沿用；若无则用 `<doc_id>-q<index>` 生成）
 - 提取字段：`entry_id`, `question`, `location`, `severity`, `type`, `code_reference`（若有）
 
@@ -255,7 +257,7 @@ Goal 4 triaged at: <ISO 8601>
 - **原问题位置**：{QA_LOCATION}
 - **剔除理由**：{should_not_be_reason}
 
-## Quality Warning（若软收敛，继承自 Stage 5）
+## Quality Warning（若 Stage 4 warning 模式，继承自 Stage 5）
 
 {原样保留}
 

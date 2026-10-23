@@ -96,8 +96,11 @@ GOAL_MET: kb-primer 完成。
   .think-tank/indexable-docs-kb-seed/prompts/stage-a-subagent.md
   .think-tank/indexable-docs-kb-seed/prompts/stage-b-subagent.md
   .think-tank/indexable-docs-kb-seed/schemas/stage-b-output.schema.json
+  .think-tank/indexable-docs-kb-seed/schemas/qa-jsonl-entry.schema.json
+  .think-tank/indexable-docs-kb-seed/schemas/index-impact.schema.json
   .think-tank/indexable-docs-kb-seed/schemas/discovered-issue.schema.json
   .think-tank/indexable-docs-kb-seed/templates/meta-knowledge-base-guide.md.template
+  .think-tank/indexable-docs-kb-seed/templates/kb-review-ledger.md.template
   .think-tank/indexable-docs-kb-seed/verify-build-findings.md
 行为：任一缺失即终止，输出：
   "种子包不完整。缺失文件：{list}。请重新完整复制种子包。"
@@ -336,10 +339,13 @@ last_maintain_mode: "seed_init"
 | 文档清单 | `troubleshooting_setup` | Stage B - B4 |
 | 分批策略 | `stage3_batches` | 主 Agent 根据 `depends_on` 拓扑 + `project_scale` 计算 |
 | 并发数 | `batch_concurrency` | small: 无限制 / medium: 8 / large: 6 |
-| Review 范围 | `review_docs` | 全部 A/F/M 文档 id 列表 |
-| Review 轮次 | `review_max_rounds` | small: 2 / medium: 5 / large: 5 |
+| Review 范围 | `review_docs` | 全部 A/F/M 文档 id 列表；Round 1 全量，Round 2+ 按 coverage 定向 |
+| Review 轮次 | `review_max_rounds` | small: 2 / medium: 5 / large: 5（全局安全上限） |
+| 定向轮次 | `targeted_rounds_per_doc` | 3（单文档一个未收敛周期内的上限） |
 | 收敛标准 | `convergence_criteria.critical_max` | 0 |
-| 收敛标准 | `convergence_criteria.medium_max` | small: 2 / medium: 4 / large: 4 |
+| 收敛标准 | `convergence_criteria.medium_max` | 0 |
+| 收敛标准 | `convergence_criteria.require_next_coverage_empty` | true |
+| 账本 | `ledger.*` | `.think-tank/knowledge-base/pass/kb-review-ledger.md` 等 |
 | QA 路径 | `qa_jsonl_pattern` | `.think-tank/knowledge-base/pass/{doc_id}.qa.jsonl`（硬编码，v2.0.1 起严格要求完整路径） |
 | 出工条件 | `max_turns` | small: 30 / medium/large: 50 |
 
@@ -381,16 +387,24 @@ N_total = N_a + N_m + N_f
 R = review_max_rounds
 
 sub_agent_stage3 = N_total
-sub_agent_stage4_max = N_total × R           # 最坏情况
-sub_agent_total = N_total × (1 + R) + 12     # +12 是 Goal 1 + Goal 3 的开销
+sub_agent_stage4_round1 = N_total
+sub_agent_stage4_targeted_expected ≈ N_total × 0.75   # 经验值，按 coverage 收缩
+sub_agent_stage4_max = N_total × R                    # 全局上限
+sub_agent_total_expected = N_total + sub_agent_stage4_round1 + sub_agent_stage4_targeted_expected + 12
+sub_agent_total_upper = N_total + sub_agent_stage4_max + 12   # +12 是 Goal 1 + Goal 3 的开销
 
-token_input_est = N_total × (1 + R) × 100K   # 平均值
-token_output_est = N_total × (1 + R) × 10K
+token_input_est_upper = (N_total + sub_agent_stage4_max) × 100K
+token_output_est_upper = (N_total + sub_agent_stage4_max) × 10K
 
 耗时估算（按并发充分）：
   small (N<8, R=2):  45min - 1.5h
   medium (N~15, R=5): 2-4h
   large (N>25, R=5):  4-8h
+
+占位符映射：
+  SUBAGENT_TOTAL = sub_agent_total_upper
+  SUBAGENT_STAGE4 = sub_agent_stage4_max
+  TARGETED_ROUNDS_PER_DOC = targeted_rounds_per_doc（默认 3）
 ```
 
 ### C.4 填充 Goal 2 任务文档模板

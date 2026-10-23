@@ -2,44 +2,68 @@
   "$schema": "https://json-schema.org/draft-07/schema#",
   "$id": "urn:indexable-docs-kb:schema:qa-jsonl-entry",
   "title": "Indexable Docs KB Seed QA JSONL Entry",
-  "description": "本文件规范 .think-tank/knowledge-base/pass/{doc_id}.qa.jsonl 中每一行的格式。Stage 3 生成时写入 round=0；Stage 4 每轮 Review 追加对应 round。**文件路径硬性约束（v2.0.1）**：QA jsonl 文件必须写入 .think-tank/knowledge-base/pass/ 目录下，路径必须以 .think-tank/knowledge-base/pass/ 开头，不允许 pass/{doc_id}.qa.jsonl（相对路径）或 .think-tank/knowledge-base/architecture/pass/... 等散落位置。**不要用于代码/流程 bug**：构建期发现的代码/流程问题使用 schemas/discovered-issue.schema.json，写入 pass/build-findings/discovered-issues.jsonl。",
+  "description": "本文件规范 .think-tank/knowledge-base/pass/{doc_id}.qa.jsonl 中每一行的格式。Stage 3 生成时写入 round=0；Stage 4 每轮 Review 追加/更新条目。**文件路径硬性约束**：必须写入 .think-tank/knowledge-base/pass/ 目录下，路径必须以 .think-tank/knowledge-base/pass/ 开头。**不要用于代码/流程 bug**：构建期发现的代码/流程问题使用 schemas/discovered-issue.schema.json，写入 pass/build-findings/discovered-issues.jsonl。 **更新方式**：同一 entry_id 追加新行，最后一行生效；更新行必须重复 entry_id / round / doc_id / location / severity / category / type / question，以及已有 fixed_in_round / action_taken。",
   "type": "object",
-  "required": ["round", "doc_id", "location", "severity", "type", "question", "status"],
+  "required": [
+    "entry_id",
+    "round",
+    "doc_id",
+    "location",
+    "severity",
+    "category",
+    "type",
+    "question",
+    "status"
+  ],
   "properties": {
+    "entry_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "稳定唯一 id，如 rdb-persistence-q3 或 QA-123。后续轮次通过它引用/关闭同一条 finding。"
+    },
     "round": {
       "oneOf": [
-        { "type": "integer", "minimum": 0 },
-        { "type": "string", "enum": ["post-build"] }
+        {
+          "type": "integer",
+          "minimum": 0
+        },
+        {
+          "type": "string",
+          "enum": [
+            "post-build"
+          ]
+        }
       ],
-      "description": "0 = Stage 3 文档生成时发现；1+ = Stage 4 Review 轮次；\"post-build\" = 人类回答后追加的 resolved 条目"
+      "description": "0 = Stage 3 文档生成时发现；1+ = Stage 4 Review 轮次；post-build = 人类回答后追加"
     },
     "doc_id": {
       "type": "string",
       "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
     },
-    "entry_id": {
-      "type": "string",
-      "description": "可选。若提供则可被后续条目通过 resolves 引用；否则用 {doc_id}#{round}#{index} 自动生成"
-    },
     "location": {
       "type": "string",
-      "description": "文档内的章节位置，如 \"§3 关键 API\" 或 \"frontmatter\""
+      "description": "文档内的章节/图表/表格位置，如 §3 关键 API、§4.2 时序图题注"
     },
     "severity": {
       "type": "string",
-      "enum": ["critical", "medium", "minor"],
-      "description": "严格按 prompts/stage-4-subagent.md 中的锚定示例判定。就高不就低。"
+      "enum": [
+        "critical",
+        "medium",
+        "minor"
+      ],
+      "description": "严格按 Stage 4 prompt 的锚定示例判定。就高不就低。"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "doc_defect",
+        "knowledge_gap"
+      ],
+      "description": "doc_defect = 文档与代码/事实不一致，必须修并参与收敛；knowledge_gap = 代码读不出来的设计意图，进 kb-build-qa.md，不参与缺陷收敛。"
     },
     "type": {
       "type": "string",
-      "description": "问题类型，建议值（非枚举，可扩展）：signature-mismatch / data-flow-error / design-rationale-unclear / prerequisite-missing / description-outdated / section-missing / terminology-inconsistent / cross-reference-missing / typo / formatting",
-      "examples": [
-        "signature-mismatch",
-        "data-flow-error",
-        "design-rationale-unclear",
-        "prerequisite-missing",
-        "description-outdated"
-      ]
+      "description": "问题类型，建议值（非枚举，可扩展）：signature-mismatch / data-flow-error / design-rationale-unclear / prerequisite-missing / description-outdated / section-missing / terminology-inconsistent / cross-reference-missing / restatement-residual / index-metadata-mismatch / typo / formatting"
     },
     "question": {
       "type": "string",
@@ -48,24 +72,110 @@
     },
     "code_reference": {
       "type": "string",
-      "description": "关联的代码位置，用符号名锚定（如 \"<File>.<ext>: <FunctionOrClassName>\"）。**禁止行号**。"
+      "description": "关联的代码位置，用符号名锚定。禁止行号。"
     },
     "status": {
       "type": "string",
-      "enum": ["open", "resolved", "resolved_in_this_round", "abandoned"],
-      "description": "open=待人类回答；resolved=已解决（可能在同一轮修复，或后续轮次由 resolves 关联解决）；resolved_in_this_round=Review sub-agent 发现即修复；abandoned=达到 Review 上限仍未解决且被人类决策放弃"
+      "enum": [
+        "open",
+        "resolved",
+        "knowledge_gap",
+        "duplicate"
+      ],
+      "description": "open = 未关闭（包括已修但未复查）；resolved = 后续轮次 fresh reviewer 确认；knowledge_gap = 后续轮次确认是知识缺口；duplicate = 后续轮次确认与另一条重复。doc_defect 的 resolved/knowledge_gap/duplicate 必须由 verified_in_round > fixed_in_round（或 > round）的后续轮次写入。"
     },
     "action_taken": {
       "type": "string",
-      "description": "若已修复，简述修复动作"
+      "description": "修复者做了什么；修复后 status 仍保持 open，等待下一轮复查。"
     },
-    "resolves": {
+    "fixed_in_round": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "修复发生的轮次；0 表示 Stage 3 生成时修复。"
+    },
+    "verified_in_round": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "后续 fresh reviewer 确认/否决的轮次。"
+    },
+    "resolution": {
       "type": "string",
-      "description": "若本条目解决了之前的某条目，写入其 entry_id"
+      "enum": [
+        "fixed",
+        "not_a_defect",
+        "reclassified",
+        "duplicate"
+      ],
+      "description": "关闭原因；not_a_defect 表示原 finding 不成立，需在 resolution_reason 说明证据。"
+    },
+    "resolution_reason": {
+      "type": "string",
+      "description": "关闭依据；not_a_defect / reclassified / duplicate 时必填。"
+    },
+    "proposed_category": {
+      "type": "string",
+      "enum": [
+        "knowledge_gap"
+      ],
+      "description": "修复者提议改判为知识缺口；status 仍为 open，等后续 reviewer 确认。"
+    },
+    "duplicate_of": {
+      "type": "string",
+      "description": "status=duplicate 时指向 canonical entry_id。"
+    },
+    "restatement_locations": {
+      "type": "array",
+      "description": "修复时检查过的同一事实其它陈述位置（图、题注、表格、相邻小节、frontmatter、§7）。",
+      "items": {
+        "type": "string"
+      }
+    },
+    "retired_phrases": {
+      "type": "array",
+      "description": "被本次 finding 否掉的具体短语；主 Agent 会加入 retired phrases 列表并扫描残留。",
+      "items": {
+        "type": "string"
+      }
+    },
+    "cross_doc_impacts": {
+      "type": "array",
+      "description": "跨文档影响；目标文档会进入下一轮轻量检查。",
+      "items": {
+        "type": "object",
+        "required": [
+          "target_doc",
+          "reason"
+        ],
+        "properties": {
+          "target_doc": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "phrase": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "index_impact": {
+      "type": "object",
+      "description": "对 index.yaml 的回流建议；结构见 schemas/index-impact.schema.json。主 Agent 串行应用，sub-agent 不直接写 index.yaml。"
     },
     "human_answer": {
       "type": "string",
       "description": "post-build 人类回答后追加"
+    },
+    "resolves": {
+      "type": "string",
+      "description": "兼容旧格式：若本条目解决了之前的某条目，写入其 entry_id。新协议优先直接更新原条目 status。"
+    },
+    "notes": {
+      "type": "string"
     }
   }
 }

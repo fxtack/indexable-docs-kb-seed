@@ -2,6 +2,7 @@
 
 > 服务于 Goal 4（`kb-qa-triage`，QA 分诊）。每个 sub-agent 负责对 **一个** kb-build-qa 中的问题做全局视角回答尝试与判定。
 > **上下文隔离**：你只处理 `QA_ENTRY_ID` 指定的这一个问题。不知道其他 sub-agent 在做什么，也不需要知道。回答完销毁上下文，主 Agent 会为下一个问题拉起新的你。
+> **输入范围**：`kb-build-qa.md` 只含 `knowledge_gap`；文档缺陷已在 Goal 2 Stage 4 关闭，不在你的分诊范围内。
 
 ---
 

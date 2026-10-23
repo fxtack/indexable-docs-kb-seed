@@ -257,9 +257,9 @@ entries:
 | 文档清单 | `flow_docs`: [{id, path, covers_code, involves_modules}] | Stage B - B3 |
 | 分批策略 | Stage 3 的分批方案：每批包含哪些文档 id | 主 Agent 根据 depends_on 拓扑 + Stage A 规模判定计算 |
 | 并发数 | 每批最多 N 个 sub-agent | 小型：不限 / 中型：≤8 / 大型：≤6 |
-| Review 范围 | Stage 4 每轮需要 Review 的文档清单（= 全部 A/F/M 文档） | Stage B |
+| Review 范围 | Round 1 全量（= 全部 A/F/M 文档）；Round 2+ 按 coverage 定向 | Stage B |
 | Review 轮次上限 | 小型：最多 2 轮 / 中型：最多 5 轮 / 大型：最多 5 轮 | Stage A 规模判定 |
-| 收敛标准 | critical: 0, medium: 小型 <3 / 中型 <5 / 大型 <5 | Stage A 规模判定 |
+| 收敛标准 | 文档缺陷 critical: 0, medium: 0；next_coverage 为空 | 硬编码 |
 | QA jsonl 路径 | `pass/{doc_id}.qa.jsonl` | 硬编码 |
 | 出工条件 | 最多 50 轮，Review 最多 5 轮 | 硬编码 |
 
@@ -413,9 +413,10 @@ Stage 3: 文档内容生成（Round 0）
   └── 按 Goal 1 确定的分批方案，逐批分派 sub-agent
   └── 每个 sub-agent 生成一份文档 + 输出自己的 QA jsonl
 
-Stage 4: 多轮 Review（Round 1, 2, ... N）
-  └── 每轮对全部文档分派 Review sub-agent
-  └── 每轮后统计问题数量，判断收敛
+Stage 4: 多轮 Review（Round 1 全量 + Round 2+ 定向）
+  └── Round 1 对全部文档分派 Review sub-agent
+  └── Round 2+ 只对 coverage 文档分派；coverage 由 ledger 四条规则计算
+  └── finding 生命周期：修复者保持 open，后续 fresh reviewer 才能 resolved
   └── 每轮独立 sub-agent（上下文隔离）
 
 Stage 5: QA 聚合
@@ -447,40 +448,77 @@ Stage 5: QA 聚合
 - `doc.id` / `doc.path` / `doc.covers_code` / `dep_docs`（实例化参数，来自 Goal 1）
 - QA jsonl 写入规范（通用，来自种子包）
 
-### 4.4 Stage 4: 多轮 Review
+### 4.4 Stage 4: 多轮 Review（Round 1 全量 + Round 2+ 定向）
 
-**确定性特征**：Review 的文档范围、每轮的 Review sub-agent 数量——全部确定。主 Agent 只需要：分派 → 收集统计 → 判断收敛 → 决定是否再来一轮。
+**确定性特征**：Round 1 的文档范围、每轮 coverage 的判定规则、finding 生命周期全部确定。主 Agent 只需按 ledger 计算 coverage、分派、收集、更新，不再做主观判断。
 
 ```
-每轮的行为：
-  for doc in all_docs:  // 全部 A/F/M 文档
-    spawn sub-agent(
-      prompt: "审查 {doc.id}：
-               文档路径：{doc.path}，
-               封面代码：{doc.covers_code}，
-               以源代码为唯一事实来源。
-               逐条验证文档声明。
-               修正发现的错误。
-               不一致项写入 pass/{doc.id}.qa.jsonl（追加）。"
-    )
+Round 1: full
+  for doc in review_docs:
+    spawn Review sub-agent(MODE=full, OPEN_FINDINGS=Stage3 open doc_defects)
   wait_all()
-  统计：critical N / medium M / minor K
-  判断：critical == 0 && medium < 收敛阈值（见 Goal 1 实例化参数中的 convergence_criteria）→ 硬收敛，进入 Stage 5
-        否则 → 下一轮（最多 review_max_rounds 轮）
-  若达到 review_max_rounds 仍未硬收敛 → **软收敛兜底**：
-    - 记录未解决项到 kb-build-qa.md 的 "quality warning" 章节
-    - 每一项标注：文档 id、问题严重度、Review 轮次历史、每轮变化趋势（趋近于零 / 反复出现 / 越来越多）
-    - Journal 追加 decision 条目：`{action: decision, decision: soft_convergence, unresolved: {critical: X, medium: Y}}`
-    - 主 Agent 输出 `GOAL_MET_WITH_WARNING: kb-docs-bake 达到轮次上限，X 项 critical / Y 项 medium 未收敛，已列入 quality warning 供人类决策`
-    - 允许人类介入：追加一轮定向 Review、放宽阈值接受现状、或标记特定文档为 draft 状态延后处理
-  更新 index.yaml（如需）
+  收集 discovered_issues → build-findings
+  应用 index_impact（描述性字段自动，结构性字段建议）
+  更新 ledger（last_review / last_change / open_ids / attempts）
+  计算 next_coverage
+
+Round 2+:
+  coverage = needs_review 的文档（四条规则）
+  for doc in coverage:
+    spawn Review sub-agent(MODE=targeted, OPEN_FINDINGS, PRIOR_CHANGES,
+                           RESTATEMENT_CHECKLIST, INDEX_FIELDS)
+  wait_all()
+  收集 discovered_issues / index_impact
+  校验 self-close（resolved 必须 verified_in_round > fixed_in_round）
+  更新 ledger
+  计算 next_coverage
+
+收敛：
+  open critical/medium doc_defect == 0
+  AND next_coverage == 空
 ```
+
+**coverage 四条规则**：
+
+```text
+needs_review(d) =
+     last_review 为空
+  OR open_ids 非空
+  OR last_change >= last_review
+  OR note 中有未完成的 cross_doc_check
+```
+
+- `open_ids`：`status=open` 的 critical/medium `doc_defect`（含 proposed knowledge_gap 待确认项）；
+- `last_change` 只记实质修改；空视为 0；cosmetic 不更新；
+- `minor` / `knowledge_gap` 不阻塞；
+- `attempts` 在文档 settled 后清零；达到 `targeted_rounds_per_doc` 仍 needs_review → escalated。
+
+**finding 生命周期**：
+
+```text
+open
+  → 修复者改文档，写 action_taken / fixed_in_round，status 仍 open
+  → 后续 fresh reviewer 写 resolved / knowledge_gap / duplicate
+```
+
+修复者不能自己关单；`resolved` / `knowledge_gap` / `duplicate` 必须由后续轮次写入，且 `verified_in_round > fixed_in_round`。
+
+**知识修复范围**：
+
+- 正文 + 同一事实的残留陈述（图、题注、表格、相邻小节、frontmatter、§7）；
+- `index.yaml` 产品字段（描述性字段 + `covers_code` 自动；`communicates_with` / `depends_on` / `involves_modules` 只建议）；
+- 跨文档影响：返回 `cross_doc_impacts`，目标文档进入下一轮轻量检查；
+- 旧表述：`retired_phrases` 写入列表并扫描残留；
+- 代码/流程 bug：走 build-findings，不在 Review 里确认或修复。
+
+**warning 状态**：达到全局轮次或单文档 attempts 上限仍有未关闭 critical/medium，输出 `GOAL_MET_WITH_WARNING`，列出 finding ID / doc / 轮次历史，不能声称硬收敛。人类决定追加定向修复、接受 warning 或标 draft。
 
 **关键约束**：
-- 每轮的 Review sub-agent 是全新的（不继承上一轮上下文）
-- 同一个文档的不同轮次 Review sub-agent 追加到同一个 `{doc.id}.qa.jsonl`
-- 主 Agent 不读 Review sub-agent 的详细发现（上下文污染），只读统计数字
-- new QA 条目追加，已有 QA 条目可以被新轮次标记 resolved
+
+- 每轮 Review sub-agent fresh context；
+- 主 Agent 读结构化 ledger，不读 finding 散文；
+- 同一文档每轮最多一个 sub-agent，追加式更新 QA JSONL（同 `entry_id` 最后一行优先）；
+- 主 Agent 是 `index.yaml` 唯一写入者，sub-agent 只返回 `index_impact`。
 
 #### 4.4.1 严重度分级锚定示例
 
@@ -516,22 +554,27 @@ Stage 5: QA 聚合
 
 ### 4.5 Stage 5: QA 聚合
 
-**确定性特征**：QA jsonl 文件列表确定（= 文档清单），聚合逻辑固定。
+**确定性特征**：QA jsonl 文件列表确定，聚合逻辑固定。
 
 ```
 行为：
   扫描所有 pass/{doc.id}.qa.jsonl
-  合并 → 去重 → 按严重度分组 → 按维度分类
-  标注 resolved vs open
+  按 entry_id 取最后一行
+  校验状态合法性（resolved/knowledge_gap/duplicate 必须由后续轮次写入）
+  门禁：hard 模式下仍有 open critical/medium doc_defect → 回到 Stage 4
+  分组：knowledge_gap 按 severity；doc_defect 只做 resolved 摘要
   输出 kb-build-qa.md
 ```
 
 **Goal 2 完成条件**：
-- 所有文档完整（N 份）
-- Review 收敛（0 critical + medium < 收敛阈值）
-- `kb-build-qa.md` 已生成
-- `pass/build-findings/discovered-issues.jsonl` 已创建（可为空）
-- Agent 输出：`GOAL_MET: kb-docs-bake 完成。文档 N 份，QA 问题 M 项（含已 resolved K 项）。请人类回答 kb-build-qa.md 中的问题。`
+
+- 所有文档完整（N 份）；
+- 没有 open critical/medium `doc_defect`，且 `next_coverage` 为空（hard）；
+  或达到上限进入 warning（不能声称硬收敛）；
+- `kb-build-qa.md` 已生成，只含 `knowledge_gap`；warning 模式额外含 Quality Warning；
+- `pass/build-findings/discovered-issues.jsonl` 已创建（可为空）；
+- `pass/kb-review-ledger.md` 已生成；
+- Agent 输出：`GOAL_MET: kb-docs-bake 完成。文档 N 份，Review 硬收敛（X 轮，coverage 收缩到 0）。`
 
 ### 4.6 构建期问题账本：build-findings
 
@@ -732,6 +775,7 @@ Sub-agent 任务：
   [ ] .think-tank/knowledge-base/troubleshooting/incidents/.meta-incident-guide.md
   [ ] .think-tank/knowledge-base/troubleshooting/.meta-ts-output-template.md（如有）
   [ ] .think-tank/knowledge-base/pass/build-findings/discovered-issues.jsonl
+  [ ] .think-tank/knowledge-base/pass/kb-review-ledger.md
   [ ] .agents/skills/explore-kb/SKILL.md
   [ ] .agents/skills/maintain-kb/SKILL.md
   [ ] .agents/skills/{{PROJECT_SLUG}}-commander/SKILL.md
@@ -754,7 +798,7 @@ Sub-agent 任务：
 
 **postmortem 生成**（由主 Agent 或分派一个 sub-agent）：读取三个 Journal 文件，聚合异常信号。包含：各 Goal 耗时、异常统计、重试率、最常见错误类型、关键决策记录、流程优化建议。
 
-**summary 生成**（由主 Agent）：一页纸的构建完成摘要。包含：三个 Goal 完成状态、总耗时、文档数量（A/F/M/T）、QA 问题统计、Skill 安装位置与 `.claude` 兼容层状态、构建期发现数量与复核入口、关键决策、下一步行动。
+**summary 生成**（由主 Agent）：一页纸的构建完成摘要。包含：三个 Goal 完成状态、总耗时、文档数量（A/F/M/T）、QA 问题统计、Skill 安装位置与 `.claude` 兼容层状态、Review ledger / 收敛轮次、构建期发现数量与复核入口、关键决策、下一步行动。
 
 **Goal 3 完成条件**：
 - 所有必选项文件存在
@@ -778,7 +822,9 @@ Goal 4 是**可选**的，在 Goal 3 完成后执行。
 
 **核心动机**：Goal 2 Stage 4 Review 阶段产出的 kb-build-qa.md 是**局部视角**的产物——每个 Review sub-agent 只看到自己负责的一份文档 + 对应 covers_code，无法从全局 KB 视角判断"这个问题是否其实已经能被 KB 回答"。等到 Goal 3 结束、KB 完整互联（含 `index.yaml.modules[]` 产品视角字段 / flows / troubleshooting / knowledge-base-guide），实际上很多局部视角提出的问题此时已经能被 KB 回答；剩下的才是真正需要人类介入的隐性知识。
 
-Goal 4 就是补上这个"全局视角回答尝试"环节。用 explore-kb 尝试回答每个 QA 问题，把结果分为 4 档：
+Goal 4 就是补上这个"全局视角回答尝试"环节。注意：`kb-build-qa.md` 只含 `knowledge_gap`；文档缺陷已在 Goal 2 Stage 4 由 fresh reviewer 关闭，不进入分诊队列。
+
+用 explore-kb 尝试回答每个 QA 问题，把结果分为 4 档：
 
 - **fully_answered**：KB 已能明确回答，人类不必再答
 - **partially_answered**：KB 部分覆盖，人类补充 kb_gaps 中的缺口即可
@@ -945,7 +991,21 @@ review_docs:  # Stage 4 需要 Review 的全部文档 id 列表
 
 convergence_criteria:
   critical_max: 0
-  medium_max: 4          # 小型工程为 2
+  medium_max: 0
+  require_next_coverage_empty: true
+
+targeted_rounds_per_doc: 3
+coverage_policy:
+  mode: full_then_targeted
+  substantive_change_always_review: true
+  minor_only_blocks: false
+  cross_doc_check: true
+
+ledger:
+  path: ".think-tank/knowledge-base/pass/kb-review-ledger.md"
+  baseline_manifest: ".think-tank/knowledge-base/pass/.review-baseline.tsv"
+  index_backup: ".think-tank/knowledge-base/pass/.review-index-before-round-1.yaml"
+  retired_phrases: ".think-tank/knowledge-base/pass/.review-retired-phrases.txt"
 
 project_scale: medium     # small | medium | large（来自 Goal 1 Stage A 的规模判定）
 max_turns: 50             # 小型工程为 30
@@ -1198,6 +1258,8 @@ Journal 条目使用 `action` 字段标记语义类型。主 Agent 在写入 Jou
     ↑ 权威状态源：哪个 Stage/Batch 处于什么状态（每 Stage 完成时更新）
 Journal Entries（pass/kb-seed-journal-*.md）
     ↑ 事件流水：每个 sub-agent 的分派、完成、重试、错误（追加式）
+Review Ledger（pass/kb-review-ledger.md）
+    ↑ Stage 4 每轮 coverage / last_review / last_change / open_ids / attempts
 文件系统（.think-tank/knowledge-base/ 下的实际文件）
     ↑ 事实核对：Journal 声称完成的，文件是否真的存在
 ```
@@ -1374,7 +1436,8 @@ v6 起明确职责分离，消除 v5 版本中两者维护重叠的问题：
 | `templates/meta-runbook-guide.md` | 通用模板 | 直接可用 |
 | `templates/meta-incident-guide.md` | 通用模板 | 直接可用 |
 | `schemas/stage-b-output.schema.json` | Schema | Stage B sub-agent 输出格式 |
-| `schemas/qa-jsonl-entry.schema.json` | Schema | QA jsonl 每行的格式 |
+| `schemas/qa-jsonl-entry.schema.json` | Schema | QA jsonl 每行的格式（category / status / closure / cross-doc / index-impact） |
+| `schemas/index-impact.schema.json` | Schema | Review/Repair sub-agent 对 `index.yaml` 的回流建议 |
 | `schemas/discovered-issue.schema.json` | Schema | 构建期发现账本（`pass/build-findings/discovered-issues.jsonl`）的格式 |
 | `schemas/goal2-task-doc.schema.yaml` | Schema | Goal 2 任务文档的参数结构 |
 | `prompts/stage-a-subagent.md` | Prompt 模板 | Stage A 的 sub-agent prompt |
@@ -1388,6 +1451,7 @@ v6 起明确职责分离，消除 v5 版本中两者维护重叠的问题：
 | `qa-triage.md` | Goal 4 任务文档 | 全局 QA 分诊：把 `kb-build-qa.md` 重组为 4 档 verdict + 产出 `kb-doc-patches.md`。默认执行 |
 | `verify-build-findings.md` | 构建后任务文档 | 对构建期发现做独立复核（不属于 Goal 1-4，不注册为 skill）；确认后才提升到 `troubleshooting/` 或 `works/` |
 | `templates/kb-readme.md.template` | 元文档模板 | 含 `{ADAPT}` 标记。Goal 3 Stage 6 用于生成 KB 根 `README.md` |
+| `templates/kb-review-ledger.md.template` | 文本账本模板 | Stage 4 开始时复制为 `pass/kb-review-ledger.md`；记录 coverage、变更、index 回流，无脚本 |
 | `knowledge-extract-qa-guide.md` | 关键元文档 | 通用文档，定义 QA 提取工作流（内嵌格式规范，替代 qa-template.md）。Goal 3 中迁移 |
 
 ---

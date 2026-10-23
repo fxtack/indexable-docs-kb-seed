@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "urn:indexable-docs-kb:schema:index-impact",
+  "title": "Indexable Docs KB Seed Index Impact",
+  "description": "Review/Repair sub-agent 对 index.yaml 的回流建议。Sub-agent 不直接写 index.yaml；主 Agent 每轮串行收集、去重、校验、应用。描述性字段可自动应用；结构性字段默认只建议。",
+  "type": "object",
+  "required": ["entry_type", "doc_id", "source_finding_ids", "updates"],
+  "properties": {
+    "entry_type": {
+      "type": "string",
+      "enum": ["module", "architecture", "flow"]
+    },
+    "doc_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+    },
+    "source_finding_ids": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1
+    },
+    "updates": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["field", "action", "reason"],
+        "properties": {
+          "field": {
+            "type": "string",
+            "enum": [
+              "description",
+              "keywords",
+              "responsibility",
+              "capability_boundary.does",
+              "capability_boundary.does_not",
+              "communicates_with",
+              "covers_code",
+              "depends_on",
+              "involves_modules"
+            ]
+          },
+          "action": {
+            "type": "string",
+            "enum": ["replace", "add", "remove"]
+          },
+          "old": {
+            "description": "replace/remove 时的原值；结构化字段可为对象/数组。"
+          },
+          "new": {
+            "description": "replace/add 时的新值；结构化字段可为对象/数组。"
+          },
+          "values": {
+            "type": "array",
+            "description": "add/remove 多项时使用；结构化字段的每一项可为对象。"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 5
+          }
+        }
+      }
+    },
+    "retired_phrases": {
+      "type": "array",
+      "description": "被 finding 否掉的具体短语，供主 Agent 扫描文档和 index.yaml 残留。",
+      "items": { "type": "string" }
+    },
+    "confidence": {
+      "type": "string",
+      "enum": ["high", "medium", "low"]
+    },
+    "notes": {
+      "type": "string"
+    }
+  }
+}

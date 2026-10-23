@@ -32,7 +32,7 @@
 
 ```bash
 # 0. （推荐）先读 DESIGN-planning.md 建立元认知
-#     理解为什么是四个 Goal、为什么 Stage A 要多维度取最大值、为什么要软收敛兜底……
+#     理解为什么是四个 Goal、为什么 Stage A 要多维度取最大值、为什么 Round 2+ 只做定向复查……
 #     知道 "why" 后遇到边缘情况才能合理判断，而不是死板套用任务文档
 
 # 1. 复制种子包到目标工程的 .think-tank/ 下（目录不存在时先创建）
@@ -69,19 +69,21 @@ cd /path/to/target-project
 | `prompts/stage-a-subagent.md` | Prompt 模板 | Goal 1 Stage A 工程理解 sub-agent（含排除路径识别） |
 | `prompts/stage-b-subagent.md` | Prompt 模板 | Goal 1 Stage B 文档清单规划 sub-agent（B2 输出含产品视角边界字段） |
 | `prompts/stage-3-subagent.md` | Prompt 模板 | Goal 2 Stage 3 文档生成 sub-agent |
-| `prompts/stage-4-subagent.md` | Prompt 模板 | Goal 2 Stage 4 Review sub-agent |
+| `prompts/stage-4-subagent.md` | Prompt 模板 | Goal 2 Stage 4 Review sub-agent（full / targeted、finding 生命周期、index 回流） |
 | `prompts/stage-5-aggregation.md` | Prompt 模板 | Goal 2 Stage 5 QA 聚合指令（含清理原始 jsonl） |
 | `prompts/stage-qa-triage-subagent.md` | Prompt 模板 | Goal 4 Stage 11 QA 分诊 sub-agent |
 | `schemas/stage-b-output.schema.json` | JSON Schema | Stage B sub-agent 输出格式（modules 段落含产品视角字段 required 定义） |
-| `schemas/qa-jsonl-entry.schema.json` | JSON Schema | QA jsonl 每行的格式 |
+| `schemas/qa-jsonl-entry.schema.json` | JSON Schema | QA jsonl 条目：category、生命周期、关闭、跨文档、index 回流字段 |
 | `schemas/goal2-task-doc.schema.yaml` | YAML Schema | Goal 2 任务文档的参数结构 |
 | `schemas/qa-triage-output.schema.json` | JSON Schema | Goal 4 sub-agent 输出格式 |
 | `schemas/discovered-issue.schema.json` | JSON Schema | 构建期发现账本（`pass/build-findings/discovered-issues.jsonl`） |
+| `schemas/index-impact.schema.json` | JSON Schema | Review/Repair sub-agent 对 `index.yaml` 的回流建议 |
 | `templates/meta-knowledge-base-guide.md.template` | 元规范模板 | 含 `{ADAPT}` 标记；§3.2 含产品视角字段规范 |
 | `templates/meta-work-guide.md` | 通用模板 | 直接可用 |
 | `templates/meta-runbook-guide.md` | 通用模板 | 直接可用 |
 | `templates/meta-incident-guide.md` | 通用模板 | 直接可用 |
 | `templates/kb-readme.md.template` | KB README 模板 | Goal 3 Stage 6 用于生成 KB 根 README |
+| `templates/kb-review-ledger.md.template` | Review 账本模板 | Stage 4 开始时复制为 `pass/kb-review-ledger.md`；文本协议，无脚本 |
 | `skills/explore-kb/` | Skill | 去耦合版，Goal 3 Stage 7 迁移到 `.agents/skills/`（Claude Code 通过 `.claude` 兼容层读取同一份文件） |
 | `skills/maintain-kb/` | Skill | 去耦合版，Goal 3 Stage 7 迁移到 `.agents/skills/` |
 | `skills/commander/` | Skill | 模板化版。**模板层**仅含 `{{PROJECT_NAME}}` / `{{PROJECT_SLUG}}` 占位符；模块/流程清单在运行时从 `index.yaml` 读取，不再内联到 skill description。**示例层**取自 Redis 8.10.2（公共领域工程）。Goal 3 Stage 7 模板化迁移到 `.agents/skills/{{PROJECT_SLUG}}-commander/` |
@@ -126,8 +128,9 @@ Goal 1: kb-primer（分析 + 规划）
 
 Goal 2: kb-docs-bake（确定性执行）
   输入：Goal 1 生成的实例化任务文档
-  过程：文档内容生成（Stage 3） → 多轮 Review（Stage 4） → QA 聚合（Stage 5）
-  产出：完整 KB 文档 + kb-build-qa.md（局部视角） + pass/build-findings/discovered-issues.jsonl（未确认）
+  过程：文档内容生成（Stage 3） → Round 1 全量 Review + Round 2+ 定向 Review（Stage 4） → QA 聚合（Stage 5）
+  产出：完整 KB 文档 + kb-build-qa.md（仅 knowledge_gap） + kb-review-ledger.md + pass/build-findings/discovered-issues.jsonl（未确认）
+  Review：修复者不能自己关单，必须由后续 fresh reviewer 确认；coverage 由实质修改、未关闭缺陷、跨文档检查和未复查修复驱动。
 
 Goal 3: kb-infra-setup（基础设施 + Skill）
   输入：Goal 2 产出的 KB
@@ -136,7 +139,7 @@ Goal 3: kb-infra-setup（基础设施 + Skill）
   注：原「Commander 内容构建」Stage 已移除（产品视角字段由 Stage B 直接产出）
 
 Goal 4: kb-qa-triage（种子包完整构建周期的最后一环）
-  输入：Goal 3 完成的 KB + kb-build-qa.md
+  输入：Goal 3 完成的 KB + kb-build-qa.md（仅 knowledge_gap）
   过程：备份 kb-build-qa → 批并行分派 sub-agent 用 explore-kb 全局回答 → 重组为 4 档 + 生成 KB patch 建议 → 刷新 build-findings 快照
   产出：4 档分诊后的 kb-build-qa.md + pass/kb-doc-patches.md（人类批准后 apply） + 最终 build-findings 快照
   默认行为：Goal 3 完成后**默认自动启动**，无需人类确认。仅当人类显式说"跳过 Goal 4"或 explore-kb 未安装时才绕过

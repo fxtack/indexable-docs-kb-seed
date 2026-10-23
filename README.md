@@ -33,7 +33,7 @@ The pack name deliberately does not bind to any dimension set, so that this kind
 ```bash
 # 0. (Recommended) Read DESIGN-planning.md first to build the mental model
 #     Understand why there are four Goals, why Stage A takes the maximum across
-#     dimensions, why there is a soft-convergence fallback...
+#     dimensions, why Round 2+ is targeted rather than full-site...
 #     Knowing the "why" lets you judge edge cases instead of applying the docs mechanically.
 
 # 1. Copy the seed pack into the target project's .think-tank/ (create it first if missing)
@@ -71,19 +71,21 @@ cd /path/to/target-project
 | `prompts/stage-a-subagent.md` | Prompt template | Goal 1 Stage A project-understanding sub-agent (includes excluded-path detection) |
 | `prompts/stage-b-subagent.md` | Prompt template | Goal 1 Stage B document-list planning sub-agent (B2 emits product-boundary fields) |
 | `prompts/stage-3-subagent.md` | Prompt template | Goal 2 Stage 3 document generation sub-agent |
-| `prompts/stage-4-subagent.md` | Prompt template | Goal 2 Stage 4 review sub-agent |
+| `prompts/stage-4-subagent.md` | Prompt template | Goal 2 Stage 4 review sub-agent (full / targeted, finding lifecycle, index feedback) |
 | `prompts/stage-5-aggregation.md` | Prompt template | Goal 2 Stage 5 QA aggregation (includes raw jsonl cleanup) |
 | `prompts/stage-qa-triage-subagent.md` | Prompt template | Goal 4 Stage 11 QA triage sub-agent |
 | `schemas/stage-b-output.schema.json` | JSON Schema | Stage B sub-agent output (modules sections require product-view fields) |
-| `schemas/qa-jsonl-entry.schema.json` | JSON Schema | Format of each line in a QA jsonl file |
+| `schemas/qa-jsonl-entry.schema.json` | JSON Schema | QA jsonl entry: category, lifecycle, closure, cross-doc, index-impact fields |
 | `schemas/goal2-task-doc.schema.yaml` | YAML Schema | Parameter structure of the Goal 2 task document |
 | `schemas/qa-triage-output.schema.json` | JSON Schema | Goal 4 sub-agent output |
 | `schemas/discovered-issue.schema.json` | JSON Schema | Build-discovered issue ledger (`pass/build-findings/discovered-issues.jsonl`) |
+| `schemas/index-impact.schema.json` | JSON Schema | `index.yaml` feedback proposals from review/repair sub-agents |
 | `templates/meta-knowledge-base-guide.md.template` | Meta-spec template | Contains `{ADAPT}` markers; §3.2 covers product-view fields |
 | `templates/meta-work-guide.md` | Generic template | Usable as-is |
 | `templates/meta-runbook-guide.md` | Generic template | Usable as-is |
 | `templates/meta-incident-guide.md` | Generic template | Usable as-is |
 | `templates/kb-readme.md.template` | KB README template | Used by Goal 3 Stage 6 to generate the KB root README |
+| `templates/kb-review-ledger.md.template` | Review ledger template | Copied to `pass/kb-review-ledger.md` at Stage 4 start; text protocol, no script |
 | `skills/explore-kb/` | Skill | Decoupled; migrated to `.agents/skills/` in Goal 3 Stage 7 (Claude Code reads it through the `.claude` compatibility link) |
 | `skills/maintain-kb/` | Skill | Decoupled; migrated to `.agents/skills/` in Goal 3 Stage 7 |
 | `skills/commander/` | Skill | Templated. **Template layer** holds only `{{PROJECT_NAME}}` / `{{PROJECT_SLUG}}`; the module/flow list is read from `index.yaml` at runtime instead of being inlined into the skill description. **Example layer** comes from Redis 8.10.2 (a public project). Migrated to `.agents/skills/{{PROJECT_SLUG}}-commander/` in Goal 3 Stage 7 |
@@ -128,8 +130,9 @@ Goal 1: kb-primer (analysis + planning)
 
 Goal 2: kb-docs-bake (deterministic execution)
   Input:  the instantiated task document from Goal 1
-  Steps:  document generation (Stage 3) -> multi-round review (Stage 4) -> QA aggregation (Stage 5)
-  Output: complete KB documents + kb-build-qa.md (local view) + pass/build-findings/discovered-issues.jsonl (unconfirmed)
+  Steps:  document generation (Stage 3) -> Round 1 full review + Round 2+ targeted review (Stage 4) -> QA aggregation (Stage 5)
+  Output: complete KB documents + kb-build-qa.md (knowledge gaps only) + kb-review-ledger.md + pass/build-findings/discovered-issues.jsonl (unconfirmed)
+  Review: a finding is closed only by a later fresh review; coverage is driven by substantive changes, open defects, cross-doc checks, and unverified fixes.
 
 Goal 3: kb-infra-setup (infrastructure + Skills)
   Input:  the KB produced by Goal 2
@@ -138,7 +141,7 @@ Goal 3: kb-infra-setup (infrastructure + Skills)
   Note:   the former "Commander content build" Stage is gone (Stage B emits product-view fields directly)
 
 Goal 4: kb-qa-triage (the last link of the full cycle)
-  Input:  the KB from Goal 3 + kb-build-qa.md
+  Input:  the KB from Goal 3 + kb-build-qa.md (knowledge gaps only)
   Steps:  back up kb-build-qa -> batch-dispatch sub-agents that answer via explore-kb -> regroup into 4 verdict buckets + KB patch suggestions -> refresh build-findings snapshot
   Output: triaged kb-build-qa.md + pass/kb-doc-patches.md (applied after human approval) + final build-findings snapshot
   Default: starts automatically after Goal 3, no confirmation needed. Skipped only if a human says

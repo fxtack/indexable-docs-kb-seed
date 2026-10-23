@@ -1,0 +1,194 @@
+# KB Review Ledger · {{PROJECT_NAME}}
+
+> 由 Goal 2 Stage 4 主 Agent 维护。**唯一用途**：记录每轮 coverage、文档变更、未关闭 finding、跨文档检查与 index.yaml 回流。
+> 路径：`.think-tank/knowledge-base/pass/kb-review-ledger.md`
+> 规则：主 Agent 只读结构化字段（entry_id / status / severity / category / doc_id），不把 finding 的完整散文搬进本文件。
+
+---
+
+## 0. 初始化（Stage 4 开始时执行一次）
+
+```bash
+# 全量 baseline，只用于 Stage 5 兜底检查
+for f in $(cat .think-tank/knowledge-base/pass/.review-docs.txt); do
+  printf '%s\t%s\n' "$(git hash-object "$f")" "$f"
+done > .think-tank/knowledge-base/pass/.review-baseline.tsv
+
+# 备份 index.yaml，供回滚
+cp .think-tank/knowledge-base/index.yaml \
+   .think-tank/knowledge-base/pass/.review-index-before-round-1.yaml
+
+# 初始化 retired phrases 列表（可为空文件）
+: > .think-tank/knowledge-base/pass/.review-retired-phrases.txt
+```
+
+`.review-docs.txt` 由主 Agent 从 Goal 2 参数 `review_docs` 生成，一行一个文档路径。
+
+---
+
+## 1. 文档状态表
+
+> 每个 review_doc 一行。`last_change` 只在**实质修改**时更新；`last_review` 每次完成 review 后更新。
+
+| doc_id | last_review | last_change | open_ids | attempts | note |
+|--------|-------------|-------------|----------|----------|------|
+| example-module | 1 | 1 | example-module-q2 | 0 | |
+| example-flow | 1 | 0 | | 0 | minor: QA-099 |
+| new-module | | | | 0 | never reviewed |
+
+**needs_review 判定（四条，满足任一即进 coverage）**：
+
+1. `last_review` 为空；
+2. `open_ids` 非空（含 `status=open` 的 critical/medium `doc_defect`，以及待确认的 proposed knowledge_gap）；
+3. `last_change >= last_review`（上次 review 中改过，或 review 之后又改过）；
+4. `note` 中有未完成的 `cross_doc_check`。
+
+**注意**：
+
+- `last_change` 只记实质修改；空视为 0；cosmetic 修改不更新；
+- hash 变了但 `change_class` 缺失 → 按 substantive；
+- `attempts` 在文档 settled 后清零；
+- `attempts >= 3` 且仍 needs_review → note 写 `escalated`，移出自动 coverage；
+- `minor` / `knowledge_gap` 只作为 note，不阻塞。
+
+---
+
+## 2. 每轮记录
+
+### Round 1 · full
+
+- coverage: 全部 review_docs
+- mode: full
+- before_manifest: `pass/.review-round-1-before.tsv`
+- after_manifest: `pass/.review-round-1-after.tsv`
+- 结果：
+
+| doc_id | reason | hash_changed | change_class | changed_sections | open_ids_after | attempts | next? |
+|--------|--------|--------------|--------------|------------------|----------------|----------|-------|
+| | | | | | | |
+
+- 下一轮 coverage：
+  - `doc-a`：last_change=1, last_review=1
+  - `doc-b`：open `QA-012`
+  - `doc-c`：cross_doc check
+
+### Round 2 · targeted
+
+- coverage:
+- mode: targeted
+- before_manifest: `pass/.review-round-2-before.tsv`
+- after_manifest: `pass/.review-round-2-after.tsv`
+- 结果：
+
+| doc_id | reason | hash_changed | change_class | changed_sections | open_ids_after | attempts | next? |
+|--------|--------|--------------|--------------|------------------|----------------|----------|-------|
+| | | | | | | |
+
+- 下一轮 coverage：
+
+### Round N（按需复制上一节）
+
+---
+
+## 3. 跨文档检查
+
+| target_doc | source_doc | source_finding | phrase/claim | checked_round | result |
+|------------|------------|----------------|--------------|---------------|--------|
+| | | | | | `fixed` / `phrase_ok` / `new_finding` |
+
+完成后清掉对应文档 note 中的 `cross_doc_check`。如果检查导致文档实质修改，更新 `last_change`。
+
+---
+
+## 4. index.yaml 回流
+
+### 自动应用字段
+
+`description` / `keywords` / `responsibility` / `capability_boundary.does` / `capability_boundary.does_not` / `covers_code`
+（`covers_code` 必须校验路径存在且不在 `excluded_paths`；`does_not` 的 `owner` 必须是有效 module id。）
+
+### 仅建议字段
+
+`communicates_with` / `depends_on` / `involves_modules`
+（写入下方「待人类确认」表，不自动改。）
+
+### 应用记录
+
+| round | doc_id | field | action | old | new | finding_ids | status |
+|-------|--------|-------|--------|-----|-----|-------------|--------|
+| | | | | | | | `applied` / `conflict` / `invalid` |
+
+### 待人类确认的结构性建议
+
+| round | doc_id | field | proposed_value | reason | finding_ids |
+|-------|--------|-------|----------------|--------|-------------|
+| | | | | | |
+
+### 冲突处理
+
+- 同字段同值 → 合并；
+- 同字段不同值 → 取 severity 更高的 finding；
+- 同 severity 仍冲突 → 不应用，记 `conflict`，交人类。
+
+---
+
+## 5. Retired phrases
+
+文件：`pass/.review-retired-phrases.txt`，一行一个具体短语。
+
+扫描范围：
+
+- `index.yaml`
+- `architecture/`
+- `modules/`
+- `flows/`
+- `troubleshooting/`
+- 排除 `pass/`、`works/`
+
+命令（无 Python）：
+
+```bash
+grep -RF -f .think-tank/knowledge-base/pass/.review-retired-phrases.txt \
+  .think-tank/knowledge-base/index.yaml \
+  .think-tank/knowledge-base/architecture \
+  .think-tank/knowledge-base/modules \
+  .think-tank/knowledge-base/flows \
+  .think-tank/knowledge-base/troubleshooting
+```
+
+命中是**候选**，不是自动失败。目标文档 reviewer 判断是否同一事实：
+
+- 是 → 修，进入下一轮；
+- 否 → 记入 accepted contexts，后续跳过该文件+章节。
+
+### Accepted contexts
+
+| phrase | file | section | reason |
+|--------|------|---------|--------|
+| | | | |
+
+---
+
+## 6. 收敛判定
+
+```text
+hard convergence =
+  open critical doc_defect == 0
+  AND open medium doc_defect == 0
+  AND next_coverage 为空
+```
+
+- 不再使用 `medium < 4`；
+- `minor` 不阻塞，报告列出；
+- `knowledge_gap` 不参与缺陷收敛；
+- `discovered_issues` 在独立的 `build-findings` 账本，不参与收敛；
+- 达到全局轮次上限或单文档 attempts 上限 → `GOAL_MET_WITH_WARNING`，列出未关闭 finding ID，不能声称硬收敛。
+
+---
+
+## 7. Stage 5 兜底检查
+
+- 重新计算全部 review_docs 的 hash；
+- 与 `.review-baseline.tsv` 对比；
+- 若某文档变了但账本中没有对应 `last_change` / review 记录 → 记 `unexpected_doc_change`，加 warning，交人类；
+- 若仍有 open critical/medium `doc_defect` → 中止 Stage 5，回到 Stage 4。

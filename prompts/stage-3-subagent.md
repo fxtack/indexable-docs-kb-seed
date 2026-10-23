@@ -85,13 +85,25 @@
 - Flow 文档：1. 触发条件 / 2. 端到端时序 / 3. 涉及模块分工 / 4. 异常路径 / 5. 相关模块文档
 - Architecture 文档：按 `META_KB_GUIDE` §架构文档规范
 
-### 4. 遇到不确定时写 QA jsonl
+### 4. 写 QA jsonl（两类：知识缺口 / 已修文档缺陷）
 
-如果你在阅读代码时遇到**无法从代码推断的问题**，追加一行到 `QA_JSONL_PATH`（每行一个 JSON 对象，符合 `schemas/qa-jsonl-entry.schema.json`）：
+阅读代码时，按两类写 `QA_JSONL_PATH`（每行一个 JSON 对象，符合 `schemas/qa-jsonl-entry.schema.json`）：
+
+**A. 知识缺口（`category: knowledge_gap`）**：代码读不出来的设计意图。`status` 直接写 `knowledge_gap`，不参与缺陷收敛。
 
 ```json
-{"round": 0, "doc_id": "<module-id>", "location": "§5 设计决策", "severity": "medium", "type": "design-rationale-unclear", "question": "<从代码推断不出的具体问题，含相关符号名>", "code_reference": "<File>.<ext>: <FunctionOrSymbol>", "status": "open"}
+{"entry_id": "<doc-id>-q1", "round": 0, "doc_id": "<module-id>", "location": "§5 设计决策", "severity": "medium", "category": "knowledge_gap", "type": "design-rationale-unclear", "question": "<从代码推断不出的具体问题，含相关符号名>", "code_reference": "<File>.<ext>: <FunctionOrSymbol>", "status": "knowledge_gap"}
 ```
+
+**B. 文档缺陷（`category: doc_defect`）**：如果你已经能明确判定文档写错，并**在本轮修正了正文**，记一条 `doc_defect`：
+
+```json
+{"entry_id": "<doc-id>-q2", "round": 0, "doc_id": "<module-id>", "location": "§3 关键 API", "severity": "critical", "category": "doc_defect", "type": "signature-mismatch", "question": "<文档声明与代码不符的具体描述>", "code_reference": "<File>.<ext>: <FunctionOrSymbol>", "status": "open", "action_taken": "已修正 §3 的函数签名", "fixed_in_round": 0, "restatement_locations": ["§3", "§4.2 时序图", "frontmatter description"]}
+```
+
+- `doc_defect` 的 `status` 必须是 `open`，由 Round 1 fresh reviewer 复查后才会变成 `resolved`；
+- 不允许在 Stage 3 写 `resolved`；
+- `entry_id` 用 `<doc_id>-q<n>`，文档内唯一、稳定。
 
 **severity 判定**（严格按此标准，不主观漂移）：
 
@@ -117,9 +129,24 @@
 
 **判定原则**："读者按文档做决策会失败吗？"→ yes = critical。就高不就低。
 
-### 5. 更新 index.yaml（如需）
+### 5. index.yaml 回流建议（不要直接写 index.yaml）
 
-如果你为 frontmatter 补充了新的 keywords 或调整了 description，同步更新 `.think-tank/knowledge-base/index.yaml` 中对应条目。
+**禁止直接修改 `.think-tank/knowledge-base/index.yaml`**（并发写冲突）。如果你改了 frontmatter 的 `description` / `keywords`，或发现 `responsibility` / `capability_boundary` 等产品字段与正文不一致，在返回值里给 `index_impact`，由主 Agent 串行应用。
+
+结构见 `schemas/index-impact.schema.json`；同一文档多条修改合并到一个 `updates` 数组。最小示例：
+
+```json
+{
+  "entry_type": "module",
+  "doc_id": "<module-id>",
+  "source_finding_ids": ["<doc-id>-q2"],
+  "updates": [
+    {"field": "description", "action": "replace", "old": "...", "new": "...", "reason": "Review 已确认原描述过时"}
+  ],
+  "retired_phrases": ["..."],
+  "confidence": "high"
+}
+```
 
 ### 6. 发现目标工程代码/流程问题（只记录）
 
@@ -165,8 +192,9 @@
   "sections_filled": ["职责", "数据模型", "关键 API", "业务流程", "设计决策", "已知陷阱", "变更影响"],
   "word_count_approx": 3500,
   "qa_entries_added": 3,
+  "doc_defects_fixed": 1,
+  "index_impact": null,
   "discovered_issues": [],
-  "index_yaml_updated": true,
   "notes": "..."
 }
 ```
@@ -177,6 +205,8 @@
 
 - **禁止**：分派新的 sub-agent；跨越 `COVERS_CODE` 之外做全局分析；引用行号；在 QA jsonl 里问不需要人类回答的问题（如"这个函数是干嘛的"——你自己应该读代码回答）
 - **禁止**：把代码/流程疑似 bug 写进 QA jsonl；修改目标工程源码/配置/测试；为了确认问题运行构建、测试或复现命令；在构建期要求人类决策
+- **禁止**：直接修改 `index.yaml`；只返回 `index_impact` 建议
+- **禁止**：给 `doc_defect` 写 `resolved`；你只能修正文并保持 `open`，等待 Round 1 复查
 - **允许**：为理解上下文而读 `COVERS_CODE` 之外的文件；提问工程决策层面的问题（"这个设计是为了兼容旧版本吗？"）
 - **必须**：以源代码为唯一事实来源；符号名锚定；填充所有必填章节（若确实无内容，写"待补充"并写 QA 条目）
 

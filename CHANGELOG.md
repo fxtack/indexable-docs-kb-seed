@@ -5,6 +5,31 @@
 >
 > **版本线说明**：正文与代码注释中出现的 `v1.x` / `v2.0.x` 是种子包并入本仓库**之前**的结构演进编号（用于解释设计沿革，例如「产品视角字段内嵌于 `index.yaml.modules[]`」是在那一代引入的），**不属于本仓库版本线**。本仓库版本以 `VERSION` 文件与 git tag 为准。
 
+## 0.3.0 — 2026-10-23
+
+### 问题
+Goal 2 的 Review 协议把「每轮全量」和「medium < 4」当作收敛判据，导致两类问题：Round 2 只覆盖部分文档也能判硬收敛；修复者可以自己写 `resolved`，下一轮没有真正复查。DeepInfer 实跑中，Round 2 只跑 13/38，留下 1 条 medium 仍判硬收敛；人工重开 Round 3 后 27 份里 26 份仍发现新问题。另一个后果是文档里的 critical 结论不会回流到 `index.yaml` 的产品字段。
+
+### 变更（**破坏性**）
+- **QA 条目新增 `category`**：`doc_defect` / `knowledge_gap`；只有 `doc_defect` 参与缺陷收敛，`knowledge_gap` 进入 `kb-build-qa.md`。
+- **QA 状态简化为**：`open` / `resolved` / `knowledge_gap` / `duplicate`；修复者只能改文档并保持 `open`，`resolved` 必须由后续轮次的 fresh reviewer 写入，且校验 `verified_in_round > fixed_in_round`。
+- **Stage 4 改为 Round 1 全量 + Round 2+ 定向**：coverage 由四条规则计算（未 review / open critical-medium / `last_change >= last_review` / 未完成 cross-doc check）；不再每轮全量，也不再使用 `medium < 4`。
+- **新增文本账本** `pass/kb-review-ledger.md` 与模板 `templates/kb-review-ledger.md.template`：记录每轮 coverage、变更、open finding、cross-doc 检查、index 回流。**不引入脚本。**
+- **新增 `schemas/index-impact.schema.json`**：Review/Repair sub-agent 对 `index.yaml` 的回流建议；主 Agent 串行应用，描述性字段可自动，`communicates_with` / `depends_on` / `involves_modules` 仅建议。
+- **新增 `retired_phrases` 扫描**：修复产生的旧表述写入列表，用 `grep -RF -f` 检查文档和 `index.yaml` 残留；命中作为 cross-doc 候选，不自动改。
+- **Stage 5 按 `entry_id` 取最后一行**：先校验 self-close，再做门禁；`kb-build-qa.md` 只收 `knowledge_gap`，`doc_defect` 只做 resolved 摘要；warning 模式的未关闭缺陷进入 Quality Warning。
+- **Goal 2 完成条件/成本/Progress Log 同步**：硬收敛要求 `open critical/medium doc_defect == 0` 且 `next_coverage` 为空；成本改为 Round 1 + 定向 coverage 估算。
+
+### 兼容性
+- 新建 KB 使用新 QA schema 和 Stage 4 协议；已有 KB 的内容和 `index.yaml` 结构不变。
+- 旧构建若没有 `category` / `entry_id` 字段，需要按新 schema 迁移后才能使用新的 Stage 5 门禁。
+- 本版本不改变 Goal 3/4 的产出路径；Goal 4 继续只分诊 `knowledge_gap`。
+
+### 影响
+- Round 2+ 不再盲查全量，也不会因为「只剩 1 条 medium」提前收敛。
+- 文档修正必须经过下一轮 fresh review；文档与 `index.yaml` 产品字段的偏差有明确回流路径。
+- 文本账本可在无 Python 环境使用；恢复时以 ledger + QA JSONL 最后版本为准。
+
 ## 0.2.4 — 2026-10-23
 
 ### 问题

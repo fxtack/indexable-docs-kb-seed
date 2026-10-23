@@ -326,6 +326,7 @@ test -f .claude/skills/{{PROJECT_SLUG}}-commander/SKILL.md
 [ ] .think-tank/knowledge-base/troubleshooting/runbooks/.meta-runbook-guide.md
 [ ] .think-tank/knowledge-base/troubleshooting/incidents/.meta-incident-guide.md
 [ ] .think-tank/knowledge-base/pass/build-findings/discovered-issues.jsonl
+[ ] .think-tank/knowledge-base/pass/kb-review-ledger.md
 [ ] .agents/skills/explore-kb/SKILL.md
 [ ] .agents/skills/maintain-kb/SKILL.md
 [ ] .agents/skills/{{PROJECT_SLUG}}-commander/SKILL.md（必装）
@@ -367,6 +368,7 @@ test -f .claude/skills/{{PROJECT_SLUG}}-commander/SKILL.md
 - .think-tank/knowledge-base/pass/kb-seed-journal-kb-docs-bake.md
 - .think-tank/knowledge-base/pass/kb-seed-journal-kb-infra-setup.md
 - .think-tank/knowledge-base/pass/kb-build-qa.md（若存在）
+- .think-tank/knowledge-base/pass/kb-review-ledger.md
 - .think-tank/knowledge-base/pass/build-findings/discovered-issues.jsonl（若存在）
 - .think-tank/knowledge-base/index.yaml（用于统计产品视角字段覆盖率）
 
@@ -376,7 +378,8 @@ test -f .claude/skills/{{PROJECT_SLUG}}-commander/SKILL.md
 ## 1. 执行概览
   - 各 Goal 起止时间 / 耗时 / 状态
   - Sub-agent 总数 / 失败数 / 重试率
-  - 硬收敛还是软收敛
+  - Review 轮次 / coverage 收缩 / 硬收敛还是 warning 状态
+  - 文档缺陷 resolved / open 数，knowledge_gap 数
   - 产品视角字段覆盖率（modules 中含 responsibility 的数量 / 总数）
 
 ## 2. 异常统计
@@ -385,7 +388,7 @@ test -f .claude/skills/{{PROJECT_SLUG}}-commander/SKILL.md
 
 ## 3. 关键决策
   - 从 Journal 中 action=decision 的条目
-  - 例：cycle_broken / soft_convergence / batch_reorder / excluded_paths_finalized
+  - 例：cycle_broken / review_warning / batch_reorder / excluded_paths_finalized
 
 ## 4. 反复出现的问题
   - Review 多轮中重复出现的问题模式（对应文档 / 问题类型）
@@ -465,8 +468,10 @@ Seed pack version: {{SEED_PACK_VERSION}}
 | Goal | 状态 | 耗时 |
 |------|------|------|
 | kb-primer | ✅ | {duration_1} |
-| kb-docs-bake | ✅ / ⚠️ soft_convergence | {duration_2} |
+| kb-docs-bake | ✅ / ⚠️ warning | {duration_2} |
 | kb-infra-setup | ✅ | {duration_3} |
+
+- Review：{review_rounds} 轮，{hard|warning}；账本：`pass/kb-review-ledger.md`
 
 ## 产出统计
 - 架构文档：{N_A} 份
@@ -475,10 +480,14 @@ Seed pack version: {{SEED_PACK_VERSION}}
 - 故障文档：symptom-index / faq / known-bugs 骨架就绪
 - Skill：explore-kb / maintain-kb / {{PROJECT_SLUG}}-commander 已安装
 
-## QA 问题统计
+## QA 问题统计（knowledge_gap）
 - Critical: open={O_c} / resolved={R_c}
 - Medium: open={O_m} / resolved={R_m}
 - Minor: open={O_min} / resolved={R_min}
+
+## 文档缺陷
+- 已修复（fresh reviewer 确认）：{R_d}
+- 未关闭（仅 warning 模式）：critical={O_cd} / medium={O_md}
 
 ## 构建期发现（未确认）
 - 目标工程代码/流程：{N_target} 项

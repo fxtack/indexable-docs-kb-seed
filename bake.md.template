@@ -3,7 +3,7 @@
 > **执行方式**：本文档由 `/goal` 驱动执行。这是 Goal 1 Stage C 填充后的实例化版本——所有参数已确定，主 Agent 按参数分派 sub-agent，不做任何动态决策。
 > **不要**：不要修改本文档的参数章节（§参数）。修改会导致执行状态漂移。
 >
-> **元认知参考**：本任务文档回答"怎么做"。若需要理解**"为什么这样做"**——如为什么 Review sub-agent 全新不继承上下文、为什么主 Agent 只读统计不读发现明细、软收敛的设计动机——请先读 `.think-tank/indexable-docs-kb-seed/DESIGN-planning.md`（尤其 §4、§9）。
+> **元认知参考**：本任务文档回答"怎么做"。若需要理解**"为什么这样做"**——如为什么 Review sub-agent 全新不继承上下文、为什么修复者不能自己关单、为什么 Round 2+ 只做定向复查——请先读 `.think-tank/indexable-docs-kb-seed/DESIGN-planning.md`（尤其 §4、§9）。
 
 ---
 
@@ -20,10 +20,11 @@
 
 - **工程规模**：`{{PROJECT_SCALE}}`（{{SCALE_REASON}}）
 - **文档总数**：N_total = {{N_TOTAL}}（A={{N_A}}, M={{N_M}}, F={{N_F}}）
-- **Sub-agent 总数（估算）**：约 **{{SUBAGENT_TOTAL}} 个**（最坏情况；若 Review 提前收敛可减少 30-50%）
+- **Sub-agent 总数（上限）**：约 **{{SUBAGENT_TOTAL}} 个**
   - Stage 3 文档生成：{{N_TOTAL}} 个
-  - Stage 4 Review：{{N_TOTAL}} × {{REVIEW_MAX_ROUNDS}} = {{SUBAGENT_STAGE4}} 个（上限）
+  - Stage 4 Review：Round 1 = {{N_TOTAL}} 个；Round 2+ 按 coverage 定向（预计 0.5–1.5×N_total，上限 {{N_TOTAL}} × {{REVIEW_MAX_ROUNDS}} = {{SUBAGENT_STAGE4}} 个）
   - Stage 5 聚合：0-1 个
+- **成本口径**：以「Round 1 全量 + 变更驱动定向」估算，不再按每轮全量计算
 - **Token 估算**：输入 ~{{TOKEN_INPUT_M}}M，输出 ~{{TOKEN_OUTPUT_K}}K
 - **预计耗时**：{{DURATION_EST}}（并发充分时）
 - **前置资源要求**：API 配额 ≥ {{QUOTA_REQ}}；建议 {{TIME_WINDOW}} 无中断时间窗口启动
@@ -42,29 +43,37 @@
 以下条件同时满足即达成：
 
 1. 所有 `{{N_TOTAL}}` 份文档已完整生成（每份的必填章节非空）
-2. Review 硬收敛（critical == 0 && medium < `{{CONVERGENCE_MEDIUM_MAX}}`），**或** 达到轮次上限进入软收敛状态
-3. `.think-tank/knowledge-base/pass/kb-build-qa.md` 已生成，包含所有 QA 条目 + 软收敛未解决项（若有）
+2. Review 达到硬收敛：
+   - 没有 `status=open` 的 critical/medium `doc_defect`；
+   - `next_coverage` 为空；
+   - **或** 达到轮次/attempts 上限，进入 warning 状态（不能声称硬收敛）
+3. `.think-tank/knowledge-base/pass/kb-build-qa.md` 已生成，只含 knowledge_gap；warning 模式额外含未关闭 doc_defect 的 Quality Warning
 4. `.think-tank/knowledge-base/pass/build-findings/discovered-issues.jsonl` 已创建（可为空文件），且 Stage 3/4 返回的 `discovered_issues` 已全部落账
-5. 本文档 Progress Log 中 Stage 3/4/5 三行状态均为 ✅
+5. `.think-tank/knowledge-base/pass/kb-review-ledger.md` 已生成，记录每轮 coverage / 变更 / 未关闭 finding
+6. 本文档 Progress Log 中 Stage 3/4/5 三行状态均为 ✅
 
 达成后主 Agent 输出：
 
 **硬收敛**：
 ```
 GOAL_MET: kb-docs-bake 完成。
-  文档 {{N_TOTAL}} 份，Review 硬收敛（{X} 轮）
-  QA 问题 {M} 项（含已 resolved {K} 项）—— **此时不要请人类回答**，QA 全局分诊留到 Goal 4。
+  文档 {{N_TOTAL}} 份，Review 硬收敛（{X} 轮，coverage 收缩到 0）
+  文档缺陷：resolved {R} 项；未关闭 critical/medium 0 项
+  knowledge_gap：{Q} 项（进入 kb-build-qa.md，Goal 4 分诊）
+  构建期发现：{D} 项（未确认，pass/build-findings/）
+  **此时不要请人类回答 knowledge_gap**，QA 全局分诊留到 Goal 4。
   下一步：直接启动 Goal 3 (kb-infra-setup) 搭建 KB 运行基础设施。
     /goal .think-tank/indexable-docs-kb-seed/infra-setup.md
 ```
 
-**软收敛**：
+**warning 状态**：
 ```
-GOAL_MET_WITH_WARNING: kb-docs-bake 达到轮次上限（{{REVIEW_MAX_ROUNDS}} 轮）
-  未解决：critical={X}, medium={Y}
-  详见 kb-build-qa.md 的 "Quality Warning" 章节
-  请人类决策：追加一轮定向 Review / 放宽阈值接受 / 标记文档为 draft
-  决策后仍继续 Goal 3 → Goal 4 完整流程（QA 未解决项会在 Goal 4 分诊时被 KB 全局视角复检）
+GOAL_MET_WITH_WARNING: kb-docs-bake 达到轮次/attempts 上限
+  未关闭 doc_defect：critical={X}, medium={Y}
+  escalated docs：{list}
+  详见 pass/kb-review-ledger.md 与 kb-build-qa.md 的 "Quality Warning" 章节
+  请人类决策：追加定向修复 / 接受 warning / 标记文档为 draft
+  决策后仍继续 Goal 3 → Goal 4 完整流程
 ```
 
 ---
@@ -116,14 +125,29 @@ batch_concurrency: {{BATCH_CONCURRENCY}}
 ### stage4_review
 
 ```yaml
-review_docs:  # 全部 A/F/M 文档，每轮全量 review
+review_docs:  # Round 1 全量；Round 2+ 只复查 coverage 中的文档
 {{REVIEW_DOCS_YAML}}
 
 review_max_rounds: {{REVIEW_MAX_ROUNDS}}
+targeted_rounds_per_doc: {{TARGETED_ROUNDS_PER_DOC}}
 
 convergence_criteria:
   critical_max: 0
-  medium_max: {{CONVERGENCE_MEDIUM_MAX}}
+  medium_max: 0
+  require_next_coverage_empty: true
+
+coverage_policy:
+  mode: full_then_targeted
+  substantive_change_always_review: true
+  minor_only_blocks: false
+  cross_doc_check: true
+
+ledger:
+  template: ".think-tank/indexable-docs-kb-seed/templates/kb-review-ledger.md.template"
+  path: ".think-tank/knowledge-base/pass/kb-review-ledger.md"
+  baseline_manifest: ".think-tank/knowledge-base/pass/.review-baseline.tsv"
+  index_backup: ".think-tank/knowledge-base/pass/.review-index-before-round-1.yaml"
+  retired_phrases: ".think-tank/knowledge-base/pass/.review-retired-phrases.txt"
 ```
 
 ### stage5_qa
@@ -163,6 +187,10 @@ journal_path: .think-tank/knowledge-base/pass/kb-seed-journal-kb-docs-bake.md
 mkdir -p .think-tank/knowledge-base/pass/build-findings
 [ -f .think-tank/knowledge-base/pass/build-findings/discovered-issues.jsonl ] || \
   : > .think-tank/knowledge-base/pass/build-findings/discovered-issues.jsonl
+# index.yaml 首次修改前的备份（Stage 3 的 index_impact 也可能触发修改）
+[ -f .think-tank/knowledge-base/pass/.review-index-before-round-1.yaml ] || \
+  cp .think-tank/knowledge-base/index.yaml \
+     .think-tank/knowledge-base/pass/.review-index-before-round-1.yaml
 ```
 
 然后按 §参数.stage3_batches 的顺序逐 batch 执行：
@@ -172,8 +200,8 @@ for batch in stage3_batches:
   spawn_sub_agents_parallel(batch.docs, prompt_template="prompts/stage-3-subagent.md")
   wait_all()
   验证：每份文档的必填章节（frontmatter + 描述 + 至少 1 个正文章节）非空
-  更新 index.yaml（补充 sub-agent 产出的 keywords / description 修订)
   收集每个 sub-agent 返回的 discovered_issues → 分配 DISC-xxxx → 追加到 build-findings/discovered-issues.jsonl
+  收集 index_impact → 备份 index.yaml（若尚未备份）→ 按 §4.5 规则串行应用
   Journal 追加 stage_completed 条目（batch 级别）
 ```
 
@@ -196,173 +224,230 @@ for batch in stage3_batches:
 ### 3.3 Stage 3 收尾
 
 - 验证所有 `{{N_TOTAL}}` 份文档存在（含 abandoned 标记）
+- 验证 `index.yaml` 仍可解析；若 Stage 3 的 `index_impact` 导致结构错误，从 `pass/.review-index-before-round-1.yaml` 恢复该条并记 Journal error
 - 更新 Progress Log：`Stage 3: ✅`
 
 ---
 
-## Stage 4: 多轮 Review
+## Stage 4: 多轮 Review（Round 1 全量 + Round 2+ 定向）
 
-### 4.1 每轮全量 Review
+### 4.1 初始化（Stage 4 开始一次）
 
-对 `review_docs` 中每份文档并行分派一个 Review sub-agent：
+主 Agent 直接执行：
+
+```bash
+# 1) 复制账本模板，并把 {{PROJECT_NAME}} 替换为实际工程名
+cp .think-tank/indexable-docs-kb-seed/templates/kb-review-ledger.md.template \
+   .think-tank/knowledge-base/pass/kb-review-ledger.md
+
+# 2) 生成 review 文档清单（一行一个路径，来自 review_docs）
+#    主 Agent 用 doc_id 查 index.yaml 的 path，写入 pass/.review-docs.txt
+
+# 3) 全量 baseline（仅 Stage 5 兜底用）
+for f in $(cat .think-tank/knowledge-base/pass/.review-docs.txt); do
+  printf '%s\t%s\n' "$(git hash-object "$f")" "$f"
+done > .think-tank/knowledge-base/pass/.review-baseline.tsv
+
+# 4) 备份 index.yaml（首次修改前；Stage 3 若已备份则保留第一份）
+[ -f .think-tank/knowledge-base/pass/.review-index-before-round-1.yaml ] || \
+  cp .think-tank/knowledge-base/index.yaml \
+     .think-tank/knowledge-base/pass/.review-index-before-round-1.yaml
+
+# 5) 初始化 retired phrases
+: > .think-tank/knowledge-base/pass/.review-retired-phrases.txt
+```
+
+Journal 追加 `{action: stage_started, stage: 4, ledger: pass/kb-review-ledger.md}`。
+
+### 4.2 Round 1：全量基线
+
+- coverage = 全部 `review_docs`；`MODE=full`。
+- 分派前记录 coverage 文档的 hash；分派后再次记录，写入 ledger。
+- 每个 sub-agent 的 prompt 参数：
+  - `MODE=full`
+  - `OPEN_FINDINGS` = Stage 3 留下的 `status=open` 的 `doc_defect`（JSON 对象数组）
+  - `PRIOR_CHANGES=[]`
+  - `RESTATEMENT_CHECKLIST` = 默认清单
+  - `INDEX_FIELDS` = 该文档在 index.yaml 中的产品字段当前值
+- `wait_all()` 后：
+  1. 收集 `discovered_issues` → 分配 `DISC-xxxx` → 追加 build-findings；
+  2. 按 §4.5 应用 `index_impact`；
+  3. 更新 ledger：`last_review=1`；有实质修改则 `last_change=1`；更新 `open_ids`、`attempts`；
+  4. 按 §4.3 计算 next coverage。
+- Round 1 也验证 Stage 3 留下的 `doc_defect`（`fixed_in_round: 0`），不要只查新问题。
+
+### 4.3 Coverage 计算（每轮结束后）
+
+主 Agent 只读结构化字段（`entry_id / doc_id / status / severity / category`），不读 finding 的完整散文。
+
+**needs_review 四条规则**（满足任一即进 coverage）：
+
+```text
+needs_review(d) =
+     last_review 为空
+  OR open_ids 非空
+  OR last_change >= last_review
+  OR note 中有未完成的 cross_doc_check
+
+next_coverage = { d | needs_review(d) 且 note 中没有 escalated }
+```
+
+- `open_ids`：`status=open` 的 critical/medium `doc_defect`（含 `proposed_category=knowledge_gap` 待确认项）；
+- `last_change` 只记实质修改；空视为 0；cosmetic 不更新；
+- hash 变了但 `change_class` 缺失 → 按 substantive；
+- `minor` / `knowledge_gap` 只作为 note，不进 coverage；
+- `attempts`：每次定向 review +1；文档 settled 后清零；达到 `targeted_rounds_per_doc` 仍 needs_review → note 写 `escalated`，移出自动 coverage；
+- `cross_doc_check` 完成后清掉对应 note；若检查导致实质修改，更新 `last_change`。
+
+每轮把 coverage 列表与每份文档的 reason 写入 ledger，并做四条 sanity check：
+
+1. 所有 open critical/medium 都在 next_coverage 或 escalated；
+2. 所有 substantive 修改文档都在 next_coverage；
+3. 所有 cross_doc_check 都在 next_coverage；
+4. next_coverage 中没有无理由的文档。
+
+### 4.4 Round 2+：定向复查
+
+只对 `next_coverage` 中的文档分派 sub-agent：
 
 ```
-for round_num in 1..review_max_rounds:
-  Journal 追加 dispatch 条目（含轮次编号）
-  for doc in review_docs:
-    spawn_sub_agent(prompt="prompts/stage-4-subagent.md", params={doc_id, doc_path, covers_code, qa_jsonl_path, round_num})
-    # ⚠️ 主 Agent 分派责任：qa_jsonl_path 必须是完整路径，从 qa_jsonl_pattern 拼接得到
-    # 正确：qa_jsonl_path = ".think-tank/knowledge-base/pass/" + doc_id + ".qa.jsonl"
-    # 错误：qa_jsonl_path = "pass/" + doc_id + ".qa.jsonl"  ← 会导致 sub-agent 按 CWD 解析散落
+for round_num in 2..review_max_rounds:
+  if next_coverage 为空:
+     break
+  Journal 追加 dispatch（mode=targeted, coverage=[...], reasons）
+  for doc in next_coverage:
+    spawn_sub_agent(prompt="prompts/stage-4-subagent.md", params={
+      doc_id, doc_path, covers_code, qa_jsonl_path, round_num,
+      MODE: "targeted",
+      COVERAGE_REASON: <ledger 中的 reason>,
+      OPEN_FINDINGS: <该文档所有 status=open 的 doc_defect 最后版本>,
+      PRIOR_CHANGES: <上一轮 changed_sections + change_class>,
+      RESTATEMENT_CHECKLIST: <默认清单或上一轮残留位置>,
+      INDEX_FIELDS: <index.yaml 当前产品字段>
+    })
   wait_all()
-  收集每份文档返回的 discovered_issues → 分配 DISC-xxxx → 追加到 build-findings/discovered-issues.jsonl
-  统计：读取每个 .think-tank/knowledge-base/pass/{doc_id}.qa.jsonl，聚合本轮新增的 critical/medium/minor 数量
-  判断：
-    if critical == 0 && medium < convergence_criteria.medium_max:
-      硬收敛，跳出循环 → Stage 5
-    else:
-      记录本轮统计 → 下一轮
+  收集 discovered_issues → build-findings
+  应用 index_impact（§4.5）
+  更新 ledger（§4.3）
+  计算 next_coverage
 ```
+
+**主 Agent 的 finding 校验**：
+
+- 按 `entry_id` 取 QA JSONL 最后一行；若最后一行缺少 `fixed_in_round`，回退到同 `entry_id` 最近一条有值的行；
+- 若 `category=doc_defect` 且 `status in (resolved, knowledge_gap, duplicate)`，但 `verified_in_round <= fixed_in_round`（或没有 `verified_in_round`）→ 判 `invalid_self_close`，在 QA JSONL 追加一行同 `entry_id` 的完整修正行（重复必要字段，`status: open`），并记 Journal error；
+- 只把 `status=open` 的 critical/medium `doc_defect` 计入 `open_ids`；
+- `knowledge_gap` / `duplicate` / `resolved` 不计入。
 
 **关键约束**：
-- 每轮的 Review sub-agent 是全新的（不继承上一轮上下文）
-- 主 Agent **只读 QA 统计数字**（jsonl 行数按 severity 分组），不读 sub-agent 的完整发现（避免上下文污染）；`discovered_issues` 只读取结构化摘要字段
-- Review sub-agent 追加到同一 jsonl，可将上一轮的条目标记 `resolved`
-- `discovered_issues` 只进 `build-findings`，不写 QA jsonl，不计入收敛，不在构建期确认或修复
 
-### 4.2 达到轮次上限的软收敛兜底
+- 每轮 sub-agent 都是 fresh context；
+- 修复者只能改文档 + 保持 `open`，不能自己写 `resolved`；
+- `resolved` / `knowledge_gap` / `duplicate` 只能由后续轮次写入；
+- 主 Agent 只读结构化 ledger，不把 finding 散文塞进上下文；构造定向 prompt 时只传该文档的 finding JSON；
+- `discovered_issues` 只进 build-findings，不写 QA、不计入收敛；
+- minor 不阻塞；文档已在 coverage 时顺手修。
 
-若跑完 `review_max_rounds` 轮仍未硬收敛：
+### 4.5 index.yaml 回流（每轮结束后）
 
-1. 主 Agent 汇总每份文档的未解决项：`{doc_id, severity, round_history, trend}`
-   - `round_history`：每轮该文档的 critical/medium 数量
-   - `trend`：`converging`（每轮减少） / `oscillating`（反复） / `growing`（增多）
-2. Journal 追加：`{action: decision, decision: soft_convergence, unresolved: {critical: X, medium: Y}}`
-3. 未解决项写入 kb-build-qa.md 的 "Quality Warning" 章节；`discovered_issues` 不写入 Quality Warning，它们属于独立的 build-findings 账本
-4. 主 Agent 输出 `GOAL_MET_WITH_WARNING`（见 §Goal 条件）
-5. 允许人类介入：追加定向 Review / 放宽阈值 / 标记 draft 文档
+1. 收集所有 sub-agent 返回的 `index_impact`；
+2. 按 `doc_id + field` 去重；冲突处理：
+   - 同值 → 合并；
+   - 不同值 → 取 severity 更高的 finding；
+   - 同 severity 仍冲突 → 不应用，记 `index_conflict`，交人类；
+3. 自动应用字段：`description` / `keywords` / `responsibility` / `capability_boundary.does` / `capability_boundary.does_not` / `covers_code`；
+   - `covers_code` 校验路径存在且不在 `excluded_paths`；
+   - `capability_boundary.does_not.owner` 必须是有效 module id；
+4. 仅建议字段：`communicates_with` / `depends_on` / `involves_modules`，写入 ledger 的「待人类确认」表，不自动改；
+5. 主 Agent 串行修改 `index.yaml`，每次改完重读 YAML 确认结构；
+6. 应用失败：撤销该条，记 `index_update_failed`，finding 保持 `open`，文档继续 coverage；
+7. 把 `retired_phrases` 追加到 `pass/.review-retired-phrases.txt`，按模板中的 `grep -RF -f` 扫描；命中作为 `cross_doc_check` 写入 ledger，不自动改；
+8. ledger 的 `index_updates` 表记录 round / doc_id / field / action / old / new / finding_ids / status。
 
-### 4.3 Stage 4 收尾
+**硬约束**：sub-agent 永远不写 `index.yaml`；主 Agent 是唯一写入者。
 
-- 每轮结束后更新 Progress Log：`Stage 4 Round N: ✅`
-- 硬收敛或达到上限后：`Stage 4: ✅ (硬收敛 X 轮 / 软收敛)`
+### 4.6 收敛与 warning
+
+**硬收敛**（同时满足）：
+
+```text
+open critical doc_defect == 0
+AND open medium doc_defect == 0
+AND next_coverage 为空
+```
+
+- 不再使用 `medium < 4`；
+- `minor` 不阻塞，QA 报告列出；
+- `knowledge_gap` 不参与缺陷收敛；
+- `discovered_issues` 在独立账本，不参与收敛。
+
+**warning 状态**：
+
+- 达到 `review_max_rounds` 或单文档 `targeted_rounds_per_doc` 后仍有未关闭 critical/medium；
+- 主 Agent 输出 `GOAL_MET_WITH_WARNING`，列出 finding ID、doc、轮次历史、已尝试修复；
+- 不能声称硬收敛；
+- 人类决策：追加定向修复 / 接受 warning / 标记 draft；接受后继续 Goal 3 → Goal 4。
+
+### 4.7 Stage 4 收尾
+
+- 每轮更新 Progress Log：`Stage 4 Round N: ✅`
+- 硬收敛后：`Stage 4: ✅ (硬收敛 X 轮)`
+- warning 后：`Stage 4: ⚠️ (warning: X 轮)`
+- 验证 `pass/kb-review-ledger.md`、`pass/.review-baseline.tsv`、`pass/.review-index-before-round-1.yaml` 存在
+- Journal 追加 `{action: decision, decision: review_converged, mode: hard|warning, rounds: N, open: {critical: X, medium: Y}}`
 
 ---
 
 ## Stage 5: QA 聚合
 
-### 5.1 扫描所有 QA jsonl 并合并
+### 5.1 读入并按 entry_id 取最后版本
 
-主 Agent 直接执行（简单聚合，不需 sub-agent；文档数量大时可选择分派 1 个 sub-agent）：
+主 Agent 直接执行（文档数量大时可分派 1 个 sub-agent）：
 
-```
-for each .think-tank/knowledge-base/pass/{doc_id}.qa.jsonl:
-  读取所有行，每行是一个 QA 条目
-合并所有条目，按 severity 分组（critical / medium / minor）
-按 dimension 分类（architecture / module / flow / troubleshooting）
-标注 open vs resolved
-```
+- 扫描 `.think-tank/knowledge-base/pass/*.qa.jsonl`；
+- 同一个 `entry_id` 可能有多行（追加式更新），**最后一行是当前状态**；若最后一行缺 `fixed_in_round`，回退到同 `entry_id` 最近一条有值的行；
+- 按 `category` 分组：`doc_defect` / `knowledge_gap`；
+- 校验状态合法性：
+  - `doc_defect` 的 `resolved` / `knowledge_gap` / `duplicate` 必须满足 `verified_in_round > fixed_in_round`（或 `> round`）；
+  - 不满足 → 记 `invalid_self_close`，按 `open` 处理。
 
-**不要合并 discovered issues**：它们不在 `*.qa.jsonl` 中，已单独落到 `build-findings/discovered-issues.jsonl`。`kb-build-qa.md` 中不得出现 `DISC-xxxx` 条目，也不得把未确认的代码/流程问题写成 QA 知识缺口。
+### 5.2 收敛门禁
 
-**扫描散落文件（v2.0.1 新增）**：合并前，主 Agent 应执行一次全局扫描，检测是否有 sub-agent 违反路径规范导致散落：
+按 `CONVERGENCE_STATUS`：
+
+- **hard**：若仍有 `status=open` 的 critical/medium `doc_defect`，或 ledger 的 `next_coverage` 非空 → **中止 Stage 5，回到 Stage 4**；
+- **warning**：允许未关闭 critical/medium `doc_defect`，但只能写入 `Quality Warning`，不能混进 knowledge_gap 的 Critical/Medium/Minor 章节，也不能声称硬收敛。
+
+### 5.3 输出 kb-build-qa.md
+
+按 `prompts/stage-5-aggregation.md` 的结构生成：
+
+- Critical / Medium / Minor 章节**只收 `knowledge_gap`**；
+- `doc_defect` 的 `resolved` 只做 `Resolved Document Defects` 摘要，不作为人类问题；
+- warning 模式下，未关闭 `doc_defect` 写入 `Quality Warning`；
+- `kb-build-qa.md` 中不得出现 `DISC-xxxx`；
+- `discovered_issues` 继续留在独立 build-findings 账本。
+
+### 5.4 清理与收尾
+
+前置校验（全部通过才删除 jsonl）：
+
+1. `kb-build-qa.md` 已生成且非空；
+2. knowledge_gap 条目数与 jsonl 按 `entry_id` 去重后的数量一致；
+3. 各 severity 计数一致；
+4. 无散落 `*.qa.jsonl`；
+5. `pass/kb-review-ledger.md` 存在；
+6. hard 模式下 `next_coverage` 为空；warning 模式已在 Quality Warning 记录。
+
+执行：
 
 ```bash
-# 检查工程根目录下的 pass/ 是否存在（v2.0.1 前的 Bug 可能导致）
-[ -d ./pass ] && echo "⚠️ 发现工程根目录下有 pass/，可能是散落"
-
-# 检查 .think-tank/knowledge-base/ 的子目录下是否有意外的 pass/
-find .think-tank/knowledge-base/ -mindepth 2 -type d -name 'pass' | grep -v '^\.think-tank/knowledge-base/pass$'
-
-# 检查其他位置是否有 .qa.jsonl 文件
-find . -name '*.qa.jsonl' -type f | grep -v '^\./\.think-tank/knowledge-base/pass/'
+find .think-tank/knowledge-base/pass/ -maxdepth 1 -name '*.qa.jsonl' -delete
 ```
 
-**处理散落**：
-- 若扫描到散落文件：主 Agent 记录到 Journal（`{action: error, error_type: qa_jsonl_scattered, files: [<list>]}`），然后**收拢**——将散落文件移动到 `.think-tank/knowledge-base/pass/` 后再执行合并
-- 若散落文件数 > 3：说明 Stage 3/4 sub-agent 大面积违规，建议中止 Stage 5 并触发 Stage 3/4 重跑（此时 sub-agent 的其他产出也可能有问题）
+Journal 追加 `action: decision, decision: qa_jsonl_cleanup`。若校验失败：不删除任何文件，输出 `GOAL_MET_WITH_WARNING`，记录原因。
 
-### 5.2 输出 kb-build-qa.md
-
-结构：
-
-```markdown
-# {{PROJECT_NAME}} KB Build QA Report
-
-Generated at: <ISO 8601>
-Seed pack version: {{SEED_PACK_VERSION}}
-Review rounds: X（hard converged / soft converged）
-
-## Summary
-- Critical: {open_count} open / {resolved_count} resolved
-- Medium: {open_count} open / {resolved_count} resolved
-- Minor: {open_count} open / {resolved_count} resolved
-
-## Critical Issues（需人类紧急回答）
-### [doc_id-1] {问题描述}
-- File: modules/xxx.md §Y
-- Detected in round: 1
-- Status: open
-- Details: ...
-（若涉及代码歧义，附上 covers_code 中的关键符号名）
-
-## Medium Issues
-...
-
-## Minor Issues（可延后）
-...
-
-## Quality Warning（若软收敛）
-以下项达到 Review 轮次上限仍未解决：
-### [doc_id-2] {问题描述}
-- Severity: critical
-- Trend: oscillating
-- Round history: r1={critical:2, medium:0}, r2={critical:2, medium:1}, r3={critical:2, medium:1}
-- 建议处理方式：{...}
-
-## 回流指引
-人类回答后，Agent 需：
-1. 打开对应 knowledge-base/*.md 文档
-2. 根据回答修订正文
-3. 在 kb-build-qa.md 中将该条目标记 `resolved: true`
-```
-
-### 5.3 清理原始 jsonl（v1.2.0 新增）
-
-**动机**：`.think-tank/knowledge-base/pass/{doc_id}.qa.jsonl` 是构建期临时产物。合并到 `.think-tank/knowledge-base/pass/kb-build-qa.md` 后，它们信息已被完整吸收，继续保留只会污染 KB（pass/ 目录里出现几十份 doc-level jsonl 让人类难以定位真正需要关注的 kb-build-qa.md）。
-
-**清理规则**：
-
-1. **前置校验**（必须全部通过才允许清理）：
-   - `.think-tank/knowledge-base/pass/kb-build-qa.md` 已成功生成
-   - `kb-build-qa.md` 中总条目数 ≥ 所有 jsonl 行数之和（合并未丢失条目）
-   - `kb-build-qa.md` 各严重度计数与 jsonl 汇总一致
-   - §5.1 的散落文件扫描已完成且已收拢（无残余散落 jsonl）
-2. **执行删除**：
-
-   ```bash
-   # 只删除 .think-tank/knowledge-base/pass/ 目录下的 doc_id.qa.jsonl 模式文件
-   # 不影响 kb-build-qa.md / kb-seed-*.md / 其他 pass/ 内容
-   # 禁止递归删除或对其他目录执行删除
-   find .think-tank/knowledge-base/pass/ -maxdepth 1 -name '*.qa.jsonl' -delete
-   ```
-
-3. **Journal 记录**：追加条目 `{action: decision, decision: qa_jsonl_cleanup, deleted_count: <N>, kept_files: [kb-build-qa.md]}`
-
-**若前置校验失败**（合并逻辑异常）：
-- **不删除**任何 jsonl，主 Agent 输出 `GOAL_MET_WITH_WARNING`（Stage 5 已成功但清理跳过）
-- Journal 追加 error 条目，说明失败原因（行数不匹配 / 严重度计数不一致等）
-- 人类可手动 review 后决定是否清理
-
-**幂等性**：清理动作是幂等的——若 Goal 2 被重跑（如从中断恢复），jsonl 已被删除时清理静默跳过。
-
-### 5.4 Stage 5 收尾
-
-- 验证 `.think-tank/knowledge-base/pass/kb-build-qa.md` 存在
-- 验证 `.think-tank/knowledge-base/pass/build-findings/discovered-issues.jsonl` 存在（可为空文件）
-- 验证 `kb-build-qa.md` 中没有 `DISC-xxxx` 条目
-- 验证 `.think-tank/knowledge-base/pass/` 下的 `{doc_id}.qa.jsonl` 全部已清理（若前置校验通过）
-- 验证工程根目录及其他位置**无遗留** `*.qa.jsonl`（散落收拢后应干净）
+- 验证 `pass/kb-review-ledger.md`、`pass/kb-build-qa.md`、`pass/build-findings/discovered-issues.jsonl` 存在
 - 更新 Progress Log：`Stage 5: ✅`
 - Journal 追加 `action: goal_completed`
 
@@ -397,8 +482,8 @@ Review rounds: X（hard converged / soft converged）
 | Stage | 状态 | 开始时间 | 完成时间 | 耗时 | 备注 |
 |-------|------|---------|---------|------|------|
 | 3. 文档生成 | ⬜ | | | | 含 discovered_issues 收集 |
-| 4. Review | ⬜ | | | | 不含 discovered_issues 收敛 |
-| 5. QA 聚合 | ⬜ | | | | 含 build-findings 落账校验 |
+| 4. Review | ⬜ | | | | Round 1 full + Round 2+ 定向；不含 discovered_issues |
+| 5. QA 聚合 | ⬜ | | | | knowledge_gap 聚合 + build-findings 校验 |
 
 **Stage 3 batch 明细**：
 
@@ -408,10 +493,10 @@ Review rounds: X（hard converged / soft converged）
 
 **Stage 4 round 明细**：
 
-| Round | 状态 | Critical | Medium | Minor | 完成时间 |
-|-------|------|----------|--------|-------|---------|
-| 1 | ⬜ | | | | |
-| 2 | ⬜ | | | | |
+| Round | 模式 | Coverage | 修改 | open C/M | pending | next | 完成时间 |
+|-------|------|----------|------|----------|---------|------|---------|
+| 1 | full | all | | | | | |
+| 2 | targeted | | | | | | |
 {{STAGE4_ROUND_EXTRA_ROWS}}
 
 **Goal 状态**：⬜ pending
@@ -421,3 +506,11 @@ Review rounds: X（hard converged / soft converged）
 ## 恢复协议
 
 见 `primer.md` 的恢复协议章节。区别：本 Goal 的 Journal 路径是 `.think-tank/knowledge-base/pass/kb-seed-journal-kb-docs-bake.md`。
+
+Stage 4 恢复时：
+
+1. 先读 `pass/kb-review-ledger.md`，找到最后一个完成的 Round；
+2. 按 `entry_id` 读 QA JSONL 的最后一行，恢复每份文档的 `open_ids`；
+3. 按 §4.3 重新计算 `next_coverage`，不要依赖对话上下文；
+4. 对 `next_coverage` 中的文档继续定向 review；
+5. 若 `index.yaml` 上次修改中断，从 `pass/.review-index-before-round-1.yaml` 恢复或按 ledger 的 `index_updates` 续做。
